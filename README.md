@@ -2,7 +2,7 @@
 FIND a German text on the Internet (Magazine, Newspaper, or other source). COPY a piece of the text that you find interesting and PASTE it in the 'Study Text Box' of the interface, Click the green button SAVE-TXT, and select the place on your computer to save the text. If you named the file, for example as, 'sports' the name of this .txt file will automatically be renamed as 'sports_TXT.txt'. Click on the pinkish button 'AI-create VOC from _TXT file' and select 'sports_TXT.txt'. The program will list the most important words of this file in the 'Vocabulary' above the 'Study Text Box'. This is your vocabulary. Save it by clicking 'SAVE-VOC' and name the file 'sports' which will automatically be renamed as 'sports_VOC.txt'. To translate the original file, click 'Translate file' to select the file of your choice (which has the suffix of *_TXT.txt), and the file will be translated and be displayed in the 'Translation Box'. In keeping with the previous example-file, the translation will be saved as 'sports_TRA.txt'.
 
 ## Screenshot
-![Image of the Graphical User Interface of the program](images/mein_deutsch_GUI.jpg)
+![Image of the Graphical User Interface of the program](images/German-Tutor-GUI.jpg.jpg)
 
 This program is workable and 99% finished. Minor changes to the GUI are pending.
 
