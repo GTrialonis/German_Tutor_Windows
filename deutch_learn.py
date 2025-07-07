@@ -75,7 +75,7 @@ class VocabularyApp:
         self.total_questions = 0  # Total number of questions asked
         self.correct_answers = 0  # Number of correct answers
         self.flip_mode = False  # Tracks whether flip mode is active
-        self.left_section_font = tkFont.Font(family="Helvetica", size=13, weight="normal")
+        self.left_section_font = tkFont.Font(family="Helvetica", size=10, weight="normal")
         self.conversation_history = []
         self.divert = 0
         
@@ -496,12 +496,12 @@ class VocabularyApp:
         font = self.left_section_font
         left_frame = tk.Frame(self.root, bg="#222")
         left_frame.pack(side=tk.LEFT, fill=tk.Y) # Changed fill from tk.BOTH to tk.Y
-        #left_frame.pack(side=tk.LEFT, fill=tk.BOTH)
+        # left_frame.pack(side=tk.LEFT, fill=tk.BOTH)
 
-        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary:", True, height=9, label_font=font)
-        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=9, label_font=font)
-        self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=9, label_font=font)
-        self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=4, label_font=font)
+        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary:", True, height=10, label_font=font)
+        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=10, label_font=font)
+        self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=10, label_font=font)
+        self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=font)
 
         # In create_left_section
         ttk.Button( # Changed from tk.Button
@@ -617,13 +617,13 @@ class VocabularyApp:
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
         self.test_filename_label.pack(anchor='w')
 
-        self.test_textbox = scrolledtext.ScrolledText(test_frame, height=6, wrap=tk.WORD, bg="#333", fg="white", font=("Helvetica", 14))
+        self.test_textbox = scrolledtext.ScrolledText(test_frame, height=7, wrap=tk.WORD, bg="#333", fg="white", font=("Helvetica", 11))
         self.test_textbox.pack(fill=tk.X)
 
         # Answer Input
         tk.Label(right_frame, text="Type your answer below and then press the ENTER key", fg="gold", bg="#222").pack(anchor='w')
         tk.Label(right_frame, text="For the 'Next Word' hold down SHIFT and press the ENTER key", fg="cyan", bg="#222").pack(anchor='w')
-        self.answer_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 14))
+        self.answer_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.answer_entry.pack(fill=tk.X)
         self.answer_entry.bind("<Return>", self.check_answer)
         self.answer_entry.bind("<Shift-Return>", self.trigger_next_word_and_refocus) # debuging / refocus entry input
@@ -642,7 +642,7 @@ class VocabularyApp:
 
         # Dictionary Search
         tk.Label(right_frame, text="Search word using AI or Langenscheid online dictionary", fg="gold", bg="#222").pack(anchor='w', pady=5)
-        self.dictionary_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 14))
+        self.dictionary_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.dictionary_entry.pack(fill=tk.X)
 
         dict_btn_frame = tk.Frame(right_frame, bg="#222")
@@ -653,7 +653,7 @@ class VocabularyApp:
         ttk.Button(dict_btn_frame, text="Clear Input", style='Orange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
-        self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=6, label_font="Helvetica")
+        self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=8, label_font="Helvetica")
 
 
     def create_labeled_inputbox(self, parent, label_text, width=80, height=20, wrap=tk.WORD, label_font=None):
@@ -676,7 +676,7 @@ class VocabularyApp:
             bg="#333",               # Matching your dark theme
             fg="white",              # Text color
             insertbackground="white", # Cursor color
-            font=("Times New Roman", 11),  # Your preferred font
+            font=("Times New Roman", 10),  # Your preferred font
             padx=10,                 # Inner padding
             pady=10
         )
@@ -705,7 +705,7 @@ class VocabularyApp:
             bg="#333",          # Background of the text area
             fg="white",          # Text color in the text area
             insertbackground="white", # Color of the cursor
-            font=("Helvetica", 16),  # Font for the text typed IN the box
+            font=("Helvetica", 12),  # Font for the text typed IN the box
             width=65 # <--- ADD THIS LINE to set width in characters
         )
         textbox.pack(fill=tk.BOTH) # Removed expand=True
