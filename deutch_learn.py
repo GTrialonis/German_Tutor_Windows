@@ -254,15 +254,24 @@ class VocabularyApp:
             2) Remove these words: der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, \
             Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, \
                 er, sie, es, wir, ihr, sie, Sie, in, an, auf, unter, über, vor, hinter, neben, zwischen, mit, nach, \
-                bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind
+                bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich \
+                uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird.
             3) Also remove these: Frühling, Sommer, Herbst, Winter
             4) The response will be outputed without using Markup or numbers before each word.
-            5) Translate the words in the english: first the german word followed by the equal sign (=) followed by \
-                one but not more than three english translations. If the word is a nount, provide the article as well.\
-                    For example: Beispiel, das [Beispiele, die] = instance, example, paradigm
-                If the german word is an irregular verb, respond with the participles, for example:\
-                    spriengen [sprang, gesprungen] = to jump, to leap. For ALL VERBS make sure to INCLUDE the \
-                    word 'to' before each English meaning, for example: gehen, [ging, geganden] = to go, to walk.
+            5) Translate the german words into the english language as instructed below but limit your responses \
+                to NOT more than THREE english translations. \
+                If the german word is a NOUN, start by displaying that word in SINGULAR form followed by \
+                a comma and then by the article, comma again and then the PLURAL form in brackets. \
+                For example, if you encounter 'Buches', display ONLY the following: Buch, das, [Bücher, die] = book, volume, ledger.
+                If the german word is a verb in any form or case, display first the base form. \
+                For example: if you encounter 'steht' DO NOT start by displaying 'steht' again, rather start by displaying \
+                the base form 'stehen' followed by a comma and in brackets the other two forms (past and past participle) \
+                'stehen, [stand, gestanden] = to stand, to rise.\
+                If you encounter a regular verb, for example 'legt', you DO NOT display 'legt' again, rather display: legen, [legte, gelegt] = to place \
+                Similarly, if you encounter an irregular verb, e.g. 'springst' you DO NOT display 'springst'again, rather you display: \
+                spriengen, [sprang, gesprungen] = to jump, to leap.
+                For ALL VERBS make sure to INCLUDE the word 'to' before the english meaning, for example: \
+                gehen, [ging, geganden] = to go, to walk.
                         """
             )
 
