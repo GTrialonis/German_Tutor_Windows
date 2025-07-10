@@ -616,7 +616,7 @@ class VocabularyApp:
         # Vocabulary Test Section
         test_frame = tk.Frame(right_frame, bg="#222")
         test_frame.pack(fill=tk.X, pady=10)
-        tk.Label(test_frame, text="Take a test of the Vocabulary (Current) or choose other '_VOC.txt'file:", fg="gold", bg="#222").pack(anchor='w')
+        tk.Label(test_frame, text="Take a test of the Vocabulary (Current) or choose other '_VOC.txt' file:", fg="gold", bg="#222").pack(anchor='w')
 
         btn_frame2 = tk.Frame(test_frame, bg="#222")
         btn_frame2.pack(fill=tk.X)
@@ -659,7 +659,7 @@ class VocabularyApp:
         dict_btn_frame.pack(fill=tk.X)
         ttk.Button(dict_btn_frame, text="AI word translation", style='DarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Langenscheidt", style='GrayBlue.TButton', command=self.fetch_langenscheidt).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(dict_btn_frame, text="Search OWN vocab.", style='DarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="Search vocabulary (Current).", style='DarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Clear Input", style='Orange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
