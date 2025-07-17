@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default notes file:
-notes_filename = r'C:\Users\George\Desktop\German-files\notes-default.txt'
+notes_filename = r'C:\Users\George\Desktop\German_Study_Files\notes-default.txt'
 
 # Access the key using os.getenv()
 api_key = os.getenv("OPENAI_API_KEY")
@@ -1093,7 +1093,7 @@ class VocabularyApp:
         self.test_textbox.delete(1.0, tk.END)
         self.test_textbox.insert(tk.END, "Please translate the following:\n")
 
-        self.count_test_num = self.count_test_num + 1
+        self.count_test_num += 1
         self.count_test_num_label.config(text=f"{self.count_test_num}")
 
         if self.flip_mode:
@@ -1102,6 +1102,15 @@ class VocabularyApp:
         else:
             german_word = self.current_word.split(' = ')[0]
             self.test_textbox.insert(tk.END, f"--> {german_word}\n")
+
+        # Clear the input field before displaying the new question
+        self.answer_entry.delete(0, tk.END)
+
+        # Dynamically detect if the English part starts with "to " (only in normal mode)
+        if not self.flip_mode:
+            english_part = self.current_word.split(' = ')[1].strip().lower()
+            if english_part.startswith("to "):
+                self.answer_entry.insert(0, "to ")
 
     def toggle_flip_mode(self):
         self.flip_mode = not self.flip_mode
@@ -1126,33 +1135,44 @@ class VocabularyApp:
         self.correct_answers = 0  # Number of correct answers
         self.test_filename_label.config(text="File is: ") # debug
         self.test_textbox.delete(1.0, tk.END)
-        
 
     def check_answer(self, event=None):
-        user_answer = self.answer_entry.get().strip()
+        user_input_raw = self.answer_entry.get().strip()
+        user_answer = user_input_raw.lower()
+
+        # Remove leading 'to ' if present for comparison
+        if user_answer.startswith("to "):
+            user_answer = user_answer[3:].strip()
+
+        # Determine the correct answers
         if self.flip_mode:
-            correct_answers = self.current_word.split(' = ')[0].split(', ')
-
+            correct_answers_raw = self.current_word.split(' = ')[0].split(', ')
         else:
-            correct_answers = self.current_word.split(' = ')[1].split(', ')
+            correct_answers_raw = self.current_word.split(' = ')[1].split(', ')
 
+        # Make a comparison list without 'to ' prefixes
+        correct_answers_normalized = [
+            answer.lower().strip()[3:].strip() if answer.lower().strip().startswith("to ")
+            else answer.lower().strip()
+            for answer in correct_answers_raw
+        ]
 
         self.total_questions += 1
 
-        if user_answer.lower() in [answer.lower() for answer in correct_answers]:
+        if user_answer in correct_answers_normalized:
             self.test_textbox.insert(tk.END, "*** Congratulations!!! ***\n")
-            self.test_textbox.insert(tk.END, f"*** YES, the correct answer is: {', '.join(correct_answers)} ***\n")
+            self.test_textbox.insert(tk.END, f"*** YES, the correct answer is: {', '.join(correct_answers_raw)} ***\n")
             self.correct_answers += 1
         else:
-            self.test_textbox.insert(tk.END, f"*** You wrote:  {user_answer}\n I'm sorry. The correct answer is: {', '.join(correct_answers)} ***\n")
+            self.test_textbox.insert(tk.END, f"*** You wrote:  {user_input_raw}\n I'm sorry. The correct answer is: {', '.join(correct_answers_raw)} ***\n")
 
         # Calculate score
         if self.total_questions > 0:
             self.score = round((self.correct_answers / self.total_questions) * 100)
             self.score_label.config(text=f"{self.score}%")
-            
 
         self.clear_input()
+
 
 class NotesEditor:
     def __init__(self, parent):
@@ -1180,7 +1200,7 @@ class NotesEditor:
 
     def open_default_file(self):
         filename = notes_filename
-        #filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        # filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         self.current_notes_file = filename  # Save the loaded filename
         if filename:
             with open(filename, 'r', encoding='utf-8-sig') as file:
