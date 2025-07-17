@@ -631,7 +631,7 @@ class VocabularyApp:
         self.test_textbox.pack(fill=tk.X)
 
         # Answer Input
-        tk.Label(right_frame, text="Type your answer below and then press the ENTER key. Add 'to' before the English verbs", fg="gold", bg="#222").pack(anchor='w')
+        tk.Label(right_frame, text="Type your answer below and then press the ENTER key. 'to' is added before the English verbs", fg="gold", bg="#222").pack(anchor='w')
         tk.Label(right_frame, text="For the 'Next Word' hold down SHIFT and press the ENTER key", fg="cyan", bg="#222").pack(anchor='w')
         self.answer_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.answer_entry.pack(fill=tk.X)
