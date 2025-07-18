@@ -597,7 +597,7 @@ class VocabularyApp:
         # right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True) # Added expand=True back
 
         # Example Sentences
-        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI, the Glosbe dictionary, also Load and Append examples", True, height=8)
+        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", True, height=8)
 
         # New Input Box for Glosbe Search
         self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 13))
@@ -1082,7 +1082,7 @@ class VocabularyApp:
                 self.vocabulary = [line.strip() for line in file.readlines() if line.strip()]
             self.display_random_word()
             self.load_current_voc = 0
-
+    
     def display_random_word(self):
         if not self.vocabulary:
             self.test_textbox.delete(1.0, tk.END)
@@ -1096,21 +1096,30 @@ class VocabularyApp:
         self.count_test_num += 1
         self.count_test_num_label.config(text=f"{self.count_test_num}")
 
+        # Try to split the line regardless of space around '='
+        try:
+            parts = self.current_word.split('=')
+            german_part = parts[0].strip()
+            english_part = parts[1].strip()
+        except IndexError:
+            # In case the line is malformed
+            self.test_textbox.insert(tk.END, "⚠️ Malformed vocabulary line.\n")
+            return
+
         if self.flip_mode:
-            english_word = self.current_word.split(' = ')[1]
-            self.test_textbox.insert(tk.END, f"--> {english_word}\n")
+            self.test_textbox.insert(tk.END, f"--> {english_part}\n")
         else:
-            german_word = self.current_word.split(' = ')[0]
-            self.test_textbox.insert(tk.END, f"--> {german_word}\n")
+            self.test_textbox.insert(tk.END, f"--> {german_part}\n")
 
         # Clear the input field before displaying the new question
         self.answer_entry.delete(0, tk.END)
 
-        # Dynamically detect if the English part starts with "to " (only in normal mode)
+        # Dynamically detect if any English translation starts with "to "
         if not self.flip_mode:
-            english_part = self.current_word.split(' = ')[1].strip().lower()
-            if english_part.startswith("to "):
+            english_entries = [e.strip().lower() for e in english_part.split(',')]
+            if any(entry.startswith("to ") for entry in english_entries):
                 self.answer_entry.insert(0, "to ")
+
 
     def toggle_flip_mode(self):
         self.flip_mode = not self.flip_mode
