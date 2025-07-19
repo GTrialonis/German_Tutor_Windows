@@ -310,9 +310,9 @@ class VocabularyApp:
 
             # Build the conditional translation prompt
             prompt = (
-                "Please translate the contents of the file into English. "
-                "However, if the contents of the file are in English or in any other language but not German, "
-                "then translate the contents into German."
+                "If the contents of the file are in German, then translate into English. "
+                "However, if the contents of the file are in English then translate into German"
+                "If the contents of the file are NEITHER in German or in English, then translate into English"
             )
             # Combine prompt and content
             full_prompt = f"{prompt}\n\n{content}"
@@ -550,7 +550,7 @@ class VocabularyApp:
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='Blue.TButton', command=self.load_vocabulary).pack(pady=3)
         ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='DarkPurple.TButton', command=self.create_vocabulary).pack(pady=3)
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='Green.TButton', command=self.save_vocabulary).pack(pady=3)
-        ttk.Button(vocab_btn_frame, text="SORT", style='GoldBrown.TButton', command=self.sort_vocabulary).pack(pady=1)
+        ttk.Button(vocab_btn_frame, text="Sort-Remove\nDuplicates", style='GoldBrown.TButton', command=self.sort_vocabulary).pack(pady=1)
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='Red.TButton', command=self.clear_vocabulary).pack(pady=3) # Adjusted from 17, as group padding will handle overall spacing
 
 
@@ -806,10 +806,38 @@ class VocabularyApp:
             messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
 
     def sort_vocabulary(self):
+        # Get content from the textbox
         content = self.vocabulary_textbox.get(1.0, tk.END)
-        sorted_content = ''.join(sorted(content.splitlines(True)))
+        
+        # Process the content to remove duplicates while preserving order
+        seen = set()
+        unique_lines = []
+        
+        for line in content.splitlines():
+            # Strip whitespace and skip empty lines
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+                
+            # Only add if we haven't seen this line before
+            if stripped_line not in seen:
+                seen.add(stripped_line)
+                unique_lines.append(stripped_line)
+        
+        # Sort the unique lines alphabetically (case-insensitive)
+        sorted_lines = sorted(unique_lines, key=lambda x: x.split('=')[0].strip().lower())
+        
+        # Join with newlines and update the textbox
+        sorted_content = '\n'.join(sorted_lines) + '\n'  # Add final newline
         self.vocabulary_textbox.delete(1.0, tk.END)
         self.vocabulary_textbox.insert(tk.END, sorted_content)
+        
+        # Show how many duplicates were removed
+        duplicate_count = len(content.splitlines()) - len(unique_lines)
+        if duplicate_count > 0:
+            messagebox.showinfo("Sort Complete", 
+                            f"Sorted vocabulary alphabetically\n"
+                            f"Removed {duplicate_count} duplicate entries")
 
     def clear_vocabulary(self):
         self.current_voc_file = None
