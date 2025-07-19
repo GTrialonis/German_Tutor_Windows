@@ -957,28 +957,33 @@ class VocabularyApp:
         word = self.dictionary_entry.get().strip()
         if not word:
             return
-
+        
         prompt = (
-            "You will be given a word which will be either in German or in English. "
-            "If the German word is a noun, then your response should include a comma, the article, followed by brackets and the plural, if any. "
-            "Then proceed with the equal sign (=) and not more than four meanings in English. "
-            "For example: Abfahrt, die [Abfahrten, die] = departure, leaving, start. "
-            "If you are given an English noun, give the German meaning(s) in a similar format but use semicolons for separation if more than one meaning, "
-            "for example: fame = Berühmtheit, die; Ruhm, der. "
-            "If the German word is a verb, then follow this pattern: abfahren, [fuhr ab, abgefahren] = depart, leave, set off. "
-            "If the English word is a verb, use the opposite pattern: depart = abfahren, [fuhr ab, abgefahren]. "
-            "If the English word is an adjective then use commas to separate German meanings if more than one. "
-            "Lastly, if you are not sure about the language of the word, assume it is German."
-        )
+        "You will receive a word that is either in German or English.\n\n"
+        "If the word is a **German noun**, respond in this format:\n"
+        "Abfahrt, die, [Abfahrten, die] = departure, leaving, start\n\n"
+        "If the word is an **English noun**, respond like this:\n"
+        "fame = Berühmtheit, die; Ruhm, der\n\n"
+        "If the word is a **German verb**, respond in this format:\n"
+        "abfahren, [fuhr ab, abgefahren] = to depart, to leave, to set off\n\n"
+        "If the word is an **English verb**, respond like this:\n"
+        "depart = abfahren, [fuhr ab, abgefahren]\n\n"
+        "If the word is an **English adjective**, give German equivalents separated by commas:\n"
+        "happy = glücklich, froh, heiter\n\n"
+        "Use 'to ' before each English verb meaning.\n"
+        "Use semicolons between multiple German meanings when translating English nouns.\n"
+        "If unsure of the language, assume it is German."
+    )
         full_prompt = f"{prompt}\n\n{word}"
+
 
         try:
             translated_word = self.ask_chatgpt(full_prompt, model_name="gpt-4o", temperature=0.3)
             if self.divert > 0:
-                self.ai_responses_textbox.insert(tk.END, translated_word, "\n") ## debuging
+                self.ai_responses_textbox.insert(tk.END, translated_word + "\n")
                 self.divert = 0
             else:
-                self.vocabulary_textbox.insert(tk.END, translated_word, "\n") ## debug this
+                self.vocabulary_textbox.insert(tk.END, translated_word + "\n")
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Translation Error", f"An error occurred: {e}")
 
