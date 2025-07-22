@@ -1,0 +1,5 @@
+verstehen, [verstand, verstanden] = to understand, to comprehend
+sprechen, [sprach, gesprochen] = to speak, to talk
+gehen, [ging, gegangen] = to go, to walk
+
+# In this example user failed to translate: verstehen, sprechen, gehen

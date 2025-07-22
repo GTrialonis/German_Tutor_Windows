@@ -1,0 +1,5 @@
+to understand = verstehen, [verstand, verstanden]
+to speak = sprechen, [sprach, gesprochen]
+to walk = gehen, [ging, gegangen]
+
+# In this example user failed to translate: to understand, to speak, to walk
