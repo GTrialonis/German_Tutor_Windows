@@ -7,3 +7,7 @@ deutchlearn/
 # Python build artifacts
 __pycache__/
 *.pyc
+
+# Ignore personal revision files
+revise-de_VOC.txt
+revise-en_VOC.txt
