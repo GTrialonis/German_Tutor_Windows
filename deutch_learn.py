@@ -1257,6 +1257,9 @@ class VocabularyApp:
         except FileNotFoundError:
             self.test_textbox.delete(1.0, tk.END)
             self.test_textbox.insert(tk.END, f"No revision file found: {filename}\n")
+        
+        self.display_random_word()
+
 
 
 
