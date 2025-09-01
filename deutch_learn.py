@@ -598,7 +598,7 @@ class VocabularyApp:
 
     def create_right_section(self):
         right_frame = tk.Frame(self.root, bg="#222")
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5) # Added padx=5
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=5) # Added padx=5
         # right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True) # Added expand=True back
 
         # Example Sentences
@@ -1233,13 +1233,13 @@ class VocabularyApp:
         missed_line = self.current_word.strip()
 
         try:
-            with open(filename, 'r', encoding='utf-8') as f:
+            with open(filename, 'r', encoding='utf-8-sig') as f:
                 lines = f.read().splitlines()
         except FileNotFoundError:
             lines = []
 
         if missed_line not in lines:
-            with open(filename, 'a', encoding='utf-8') as f:
+            with open(filename, 'a', encoding='utf-8-sig') as f:
                 f.write(missed_line + "\n")
     
 
@@ -1250,7 +1250,7 @@ class VocabularyApp:
         filename = "revise-de_VOC.txt" if not self.flip_mode else "revise-en_VOC.txt"
 
         try:
-            with open(filename, 'r', encoding='utf-8') as f:
+            with open(filename, 'r', encoding='utf-8-sig') as f:
                 self.vocabulary = [line.strip() for line in f if line.strip()]
             self.test_textbox.delete(1.0, tk.END)
             self.test_textbox.insert(tk.END, f"Loaded {len(self.vocabulary)} revision items from {filename}\n")
