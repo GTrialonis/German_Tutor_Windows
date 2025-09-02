@@ -626,7 +626,7 @@ class VocabularyApp:
         btn_frame2 = tk.Frame(test_frame, bg="#222")
         btn_frame2.pack(fill=tk.X)
         ttk.Button(btn_frame2, text="Choose other '_VOC.txt' File", style='Blue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame2, text="Flip Sentences", style='GoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Flip Words", style='GoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Clear Test", style='Orange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
@@ -1076,7 +1076,8 @@ class VocabularyApp:
         self.vocabulary_textbox.insert(tk.END, f"{word}, {article} = {meaning}\n")
 
     def load_examples(self):
-        filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        filename = r"C:\Users\George\Desktop\German_Study_Files\example-sentences.txt"
+        # filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         if filename:
             self.current_example_sentences_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
