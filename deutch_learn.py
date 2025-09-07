@@ -167,7 +167,8 @@ class VocabularyApp:
                             foreground='black',
                             font=self.left_section_font)
 
-
+        # Setup basic highlighting functionality
+        self.setup_highlighting_basics()
 
         # Left Side - Vocabulary, Study Text, and Translation Boxes
         self.create_left_section()
@@ -177,7 +178,60 @@ class VocabularyApp:
 
         # Right Side - Example Sentences, Test Section, Dictionary Search
         self.create_right_section()
+        
+        # Add status bar
+        self.status_bar = ttk.Label(self.root, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
     
+    def setup_highlighting_basics(self):
+        """Initialize basic highlighting functionality"""
+        # Create context menu
+        self.context_menu = tk.Menu(self.root, tearoff=0)
+        self.context_menu.add_command(label="Highlight", command=self.highlight_selection)
+        self.context_menu.add_command(label="Clear Highlights", command=self.clear_highlights)
+        
+        # Add keyboard shortcuts
+        self.root.bind("<Control-h>", lambda e: self.highlight_selection())
+        self.root.bind("<Control-Shift-H>", lambda e: self.clear_highlights())
+    
+    def highlight_selection(self, event=None):
+        """Highlight the currently selected text in the focused text widget"""
+        # Try all three text widgets to find which one has a selection
+        for text_widget in [self.study_textbox, self.translation_textbox, self.vocabulary_textbox]:
+            try:
+                # Check if text is selected in this widget
+                if text_widget.tag_ranges(tk.SEL):
+                    start = text_widget.index(tk.SEL_FIRST)
+                    end = text_widget.index(tk.SEL_LAST)
+                    
+                    # Add highlight tag to selection
+                    text_widget.tag_add("highlight", start, end)
+                    
+                    # Update status bar
+                    self.status_bar.config(text=f"Text highlighted from {start} to {end}")
+                    
+                    # Keep the text selected after highlighting (optional)
+                    text_widget.tag_add(tk.SEL, start, end)
+                    text_widget.mark_set(tk.INSERT, end)
+                    return  # Exit after processing the first widget with a selection
+            except tk.TclError:
+                continue  # No selection in this widget, try the next one
+    
+    # If we get here, no text was selected in any widget
+        self.status_bar.config(text="No text selected for highlighting")
+    
+    def clear_highlights(self, event=None):
+        """Clear all highlights from all text widgets"""
+        for text_widget in [self.study_textbox, self.translation_textbox, self.vocabulary_textbox]:
+            text_widget.tag_remove("highlight", "1.0", tk.END)
+        
+        # Update status bar
+        self.status_bar.config(text="All highlights cleared")
+    
+    def show_context_menu(self, event):
+        """Show the right-click context menu"""
+        self.context_menu.post(event.x_root, event.y_root)
+
     # --- REFOCUS THE CURSON INSIDE THE TEST INPUT ---
     def trigger_next_word_and_refocus(self, event=None):
         """
@@ -521,6 +575,9 @@ class VocabularyApp:
         self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=10, label_font=font)
         self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=font)
 
+        # Setup highlighting for text widgets
+        self.setup_text_widget_highlighting()
+
         # In create_left_section
         ttk.Button( # Changed from tk.Button
             left_frame,
@@ -544,6 +601,28 @@ class VocabularyApp:
             style='Purple.TButton', # <--- NEW: Apply the purple style
             command=self.en_to_de_translation
         ).pack(side='left', padx=3, pady=3)
+        
+        # Add highlight buttons to left section
+        highlight_frame = ttk.Frame(left_frame)
+        highlight_frame.pack(side='left', padx=10, pady=3)
+        
+        ttk.Button(highlight_frame, text="Highlight", 
+                  command=self.highlight_selection).pack(side='left', padx=2)
+        ttk.Button(highlight_frame, text="Clear Highlights", 
+                  command=self.clear_highlights).pack(side='left', padx=2)
+    
+    def setup_text_widget_highlighting(self):
+        """Initialize highlighting for the text widgets"""
+        """Initialize highlighting for the text widgets"""
+        # Configure highlight tags with black text for better visibility
+        self.study_textbox.tag_configure("highlight", background="yellow", foreground="black")
+        self.translation_textbox.tag_configure("highlight", background="yellow", foreground="black")
+        self.vocabulary_textbox.tag_configure("highlight", background="yellow", foreground="black")
+        
+        # Bind right-click context menu
+        self.study_textbox.bind("<Button-3>", self.show_context_menu)
+        self.translation_textbox.bind("<Button-3>", self.show_context_menu)
+        self.vocabulary_textbox.bind("<Button-3>", self.show_context_menu)
 
     def create_middle_section(self):
         middle_frame = tk.Frame(self.root, bg="#222")
