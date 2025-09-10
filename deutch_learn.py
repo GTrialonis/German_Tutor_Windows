@@ -79,6 +79,9 @@ class VocabularyApp:
         self.conversation_history = []
         self.divert = 0
         self.load_current_voc = 0
+
+        # Create a smaller font for the highlight buttons
+        self.small_button_font = tkFont.Font(family="Helvetica", size=8, weight="normal")
         
         # MANUAL CONFIGURATION OF COLOR BUTTONS
         # ... inside __init__ method ...
@@ -166,72 +169,35 @@ class VocabularyApp:
                             background="#AABD7E",
                             foreground='black',
                             font=self.left_section_font)
+        
+        # In your __init__ method, add these style definitions
+        self.style.configure('SmallGreen.TButton',
+                    background='#008844',
+                    foreground='white',
+                    font=self.small_button_font)
 
-        # Setup basic highlighting functionality
-        self.setup_highlighting_basics()
+        self.style.configure('SmallOrange.TButton',
+                    background='orange',
+                    foreground='black',
+                    font=self.small_button_font)
 
-        # Left Side - Vocabulary, Study Text, and Translation Boxes
+
+
+        # Left Section - Vocabulary, Study Text, and Translation Boxes
         self.create_left_section()
 
-        # Middle - Buttons for LOAD, SAVE, etc.
+        # Middle - Section for LOAD, SAVE, etc.
         self.create_middle_section()
 
-        # Right Side - Example Sentences, Test Section, Dictionary Search
+        # Right Section - Example Sentences, Test Section, Dictionary Search
         self.create_right_section()
-        
-        # Add status bar
-        self.status_bar = ttk.Label(self.root, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
-    
-    def setup_highlighting_basics(self):
-        """Initialize basic highlighting functionality"""
-        # Create context menu
-        self.context_menu = tk.Menu(self.root, tearoff=0)
-        self.context_menu.add_command(label="Highlight", command=self.highlight_selection)
-        self.context_menu.add_command(label="Clear Highlights", command=self.clear_highlights)
-        
-        # Add keyboard shortcuts
-        self.root.bind("<Control-h>", lambda e: self.highlight_selection())
-        self.root.bind("<Control-Shift-H>", lambda e: self.clear_highlights())
-    
-    def highlight_selection(self, event=None):
-        """Highlight the currently selected text in the focused text widget"""
-        # Try all three text widgets to find which one has a selection
-        for text_widget in [self.study_textbox, self.translation_textbox, self.vocabulary_textbox]:
-            try:
-                # Check if text is selected in this widget
-                if text_widget.tag_ranges(tk.SEL):
-                    start = text_widget.index(tk.SEL_FIRST)
-                    end = text_widget.index(tk.SEL_LAST)
-                    
-                    # Add highlight tag to selection
-                    text_widget.tag_add("highlight", start, end)
-                    
-                    # Update status bar
-                    self.status_bar.config(text=f"Text highlighted from {start} to {end}")
-                    
-                    # Keep the text selected after highlighting (optional)
-                    text_widget.tag_add(tk.SEL, start, end)
-                    text_widget.mark_set(tk.INSERT, end)
-                    return  # Exit after processing the first widget with a selection
-            except tk.TclError:
-                continue  # No selection in this widget, try the next one
-    
-    # If we get here, no text was selected in any widget
-        self.status_bar.config(text="No text selected for highlighting")
-    
-    def clear_highlights(self, event=None):
-        """Clear all highlights from all text widgets"""
-        for text_widget in [self.study_textbox, self.translation_textbox, self.vocabulary_textbox]:
-            text_widget.tag_remove("highlight", "1.0", tk.END)
-        
-        # Update status bar
-        self.status_bar.config(text="All highlights cleared")
-    
-    def show_context_menu(self, event):
-        """Show the right-click context menu"""
-        self.context_menu.post(event.x_root, event.y_root)
 
+        # Add highlight functionality to textboxes
+        self.add_highlight_functionality()
+
+        # Create a smaller font for the highlight buttons
+        self.small_button_font = tkFont.Font(family="Helvetica", size=8, weight="normal")
+    
     # --- REFOCUS THE CURSON INSIDE THE TEST INPUT ---
     def trigger_next_word_and_refocus(self, event=None):
         """
@@ -567,62 +533,35 @@ class VocabularyApp:
     def create_left_section(self):
         font = self.left_section_font
         left_frame = tk.Frame(self.root, bg="#222")
-        left_frame.pack(side=tk.LEFT, fill=tk.Y) # Changed fill from tk.BOTH to tk.Y
-        # left_frame.pack(side=tk.LEFT, fill=tk.BOTH)
+        left_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        # Create textboxes - only add highlight buttons to Study Text Box and Translation Box
+        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=10, label_font=font, add_buttons=False)
+        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=10, label_font=font, add_buttons=True)
+        self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=10, label_font=font, add_buttons=True)
+        self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=font, add_buttons=False)
 
-        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=10, label_font=font)
-        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=10, label_font=font)
-        self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=10, label_font=font)
-        self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=font)
-
-        # Setup highlighting for text widgets
-        self.setup_text_widget_highlighting()
-
-        # In create_left_section
-        ttk.Button( # Changed from tk.Button
+        # Add the AI prompt buttons
+        ttk.Button(
             left_frame,
             text="Prompt AI",
-            style='Purple.TButton', # <--- NEW: Apply the style here
+            style='Purple.TButton',
             command=self.prompt_inputbox
         ).pack(side='left', padx=(10, 3), pady=3)
 
-        # For the "Clear Prompt" button (which uses red):
-        ttk.Button( # Changed from tk.Button
+        ttk.Button(
             left_frame,
             text="Clear Prompt",
-            style='Red.TButton', # <--- NEW: Apply the red style
+            style='Red.TButton',
             command=self.clear_input_textbox
         ).pack(side='left', padx=3, pady=3)
 
-        # For the "Create sentences..." button (which uses purple):
-        ttk.Button( # Changed from tk.Button
+        ttk.Button(
             left_frame,
             text="Create sentences from random words in a _VOC file",
-            style='Purple.TButton', # <--- NEW: Apply the purple style
+            style='Purple.TButton',
             command=self.en_to_de_translation
         ).pack(side='left', padx=3, pady=3)
-        
-        # Add highlight buttons to left section
-        highlight_frame = ttk.Frame(left_frame)
-        highlight_frame.pack(side='left', padx=10, pady=3)
-        
-        ttk.Button(highlight_frame, text="Highlight", 
-                  command=self.highlight_selection).pack(side='left', padx=2)
-        ttk.Button(highlight_frame, text="Clear Highlights", 
-                  command=self.clear_highlights).pack(side='left', padx=2)
-    
-    def setup_text_widget_highlighting(self):
-        """Initialize highlighting for the text widgets"""
-        """Initialize highlighting for the text widgets"""
-        # Configure highlight tags with black text for better visibility
-        self.study_textbox.tag_configure("highlight", background="yellow", foreground="black")
-        self.translation_textbox.tag_configure("highlight", background="yellow", foreground="black")
-        self.vocabulary_textbox.tag_configure("highlight", background="yellow", foreground="black")
-        
-        # Bind right-click context menu
-        self.study_textbox.bind("<Button-3>", self.show_context_menu)
-        self.translation_textbox.bind("<Button-3>", self.show_context_menu)
-        self.vocabulary_textbox.bind("<Button-3>", self.show_context_menu)
 
     def create_middle_section(self):
         middle_frame = tk.Frame(self.root, bg="#222")
@@ -782,37 +721,102 @@ class VocabularyApp:
 
         return inputbox  # Return the widget for later access
 
-    def create_labeled_textbox(self, parent, label_text, add_scrollbar=False, height=5, label_font=None):
+    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font=None, add_buttons=False):
+        """Create a labeled textbox with optional scrollbar and optional highlight buttons"""
         frame = tk.Frame(parent, bg="#222")
-        frame.pack(fill=tk.X, padx=10, pady=(0,0 )) # Pack the container frame
+        frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+        
+        label = tk.Label(frame, text=label_text, bg="#222", fg="white", font=label_font)
+        label.pack(anchor="w")
+        
+        if scrollbar:
+            textbox = scrolledtext.ScrolledText(frame, height=height, bg="#333", fg="white", 
+                                               insertbackground="white", font=label_font)
+        else:
+            textbox = tk.Text(frame, height=height, bg="#333", fg="white", 
+                            insertbackground="white", font=label_font)
+        
+        textbox.pack(fill=tk.X, pady=(5, 0))
+        
+        # Configure highlight tag with yellow background and black text
+        textbox.tag_configure("highlight", background="yellow", foreground="black")
+        
+        # Only add buttons if requested
+        if add_buttons:
+            # Create button frame for this textbox
+            button_frame = tk.Frame(frame, bg="#222")
+            button_frame.pack(fill=tk.X, pady=(0, 2))
 
-        # Create the label widget
-        label = tk.Label(frame, text=label_text, fg="gold", bg="#222")
-
-        # Apply the custom font to the label IF one was provided
-        if label_font:
-            label.config(font=label_font) # Use config() to set the font
-
-        # Pack the label
-        label.pack(anchor='w') # Anchor to the west (left side)
-
-        textbox = scrolledtext.ScrolledText(
-            frame,
-            height=height,
-            wrap=tk.WORD,
-            bg="#333",          # Background of the text area
-            fg="white",          # Text color in the text area
-            insertbackground="white", # Color of the cursor
-            font=("Helvetica", 12),  # Font for the text typed IN the box
-            width=65 # <--- ADD THIS LINE to set width in characters
-        )
-        textbox.pack(fill=tk.BOTH) # Removed expand=True
-        #textbox.pack(fill=tk.BOTH, expand=True) # Pack the text box
-
-        # Return the textbox widget so you can interact with it later
+            # Create highlight buttons with smaller font
+            small_font = tkFont.Font(family="Helvetica", size=8, weight="normal")  # Add this line
+            
+            # Create highlight buttons
+            ttk.Button(
+                button_frame,
+                text="Highlight",
+                style='SmallGreen.TButton',
+                command=lambda: self.highlight_text(textbox)
+            ).pack(side='left', padx=(5, 2), pady=1)
+            
+            ttk.Button(
+                button_frame,
+                text="Clear Highlight",
+                style='SmallOrange.TButton',
+                command=lambda: self.clear_text_highlight(textbox)
+            ).pack(side='left', padx=1, pady=1)
+        
         return textbox
 
+    def add_highlight_functionality(self):
+        """Add highlight functionality to the three main textboxes"""
+        # Bind keyboard shortcuts
+        self.root.bind('<Control-h>', self.highlight_selection)
+        self.root.bind('<Control-Shift-H>', self.clear_highlight)
+    
+    def highlight_text(self, textbox):
+        """Highlight selected text in the given textbox"""
+        try:
+            # Remove any existing highlight tags first
+            textbox.tag_remove("highlight", "1.0", tk.END)
+            
+            # Check if there's a selection
+            if textbox.tag_ranges(tk.SEL):
+                start = textbox.index(tk.SEL_FIRST)
+                end = textbox.index(tk.SEL_LAST)
+                
+                # Apply highlight tag
+                textbox.tag_add("highlight", start, end)
+        except tk.TclError:
+            # No selection found
+            pass
+    
+    def clear_text_highlight(self, textbox):
+        """Clear highlight from the given textbox"""
+        textbox.tag_remove("highlight", "1.0", tk.END)
+    
+    def highlight_selection(self, event=None):
+        """Highlight selected text in the focused textbox (keyboard shortcut)"""
+        # Get the currently focused widget
+        focused_widget = self.root.focus_get()
+        
+        # Check if it's one of our textboxes
+        if focused_widget in [self.vocabulary_textbox, self.study_textbox, self.translation_textbox]:
+            self.highlight_text(focused_widget)
+        
+        return "break"  # Prevent default behavior
+    
+    def clear_highlight(self, event=None):
+        """Clear highlight from the focused textbox (keyboard shortcut)"""
+        # Get the currently focused widget
+        focused_widget = self.root.focus_get()
+        
+        # Check if it's one of our textboxes
+        if focused_widget in [self.vocabulary_textbox, self.study_textbox, self.translation_textbox]:
+            self.clear_text_highlight(focused_widget)
+        
+        return "break"  # Prevent default behavior
 
+# -------------------- END OF HIGHLIGHTING --------------
     def load_vocabulary(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 

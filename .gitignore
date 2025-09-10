@@ -11,3 +11,6 @@ __pycache__/
 # Ignore personal revision files
 revise-de_VOC.txt
 revise-en_VOC.txt
+
+# Ignore earlier major version
+deutch_learn_original.py
