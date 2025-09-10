@@ -171,14 +171,14 @@ class VocabularyApp:
                             font=self.left_section_font)
         
         # In your __init__ method, add these style definitions
-        self.style.configure('SmallGreen.TButton',
-                    background='#008844',
+        self.style.configure('SmallWhite.TButton',
+                    background='#7B7D7D',
                     foreground='white',
                     font=self.small_button_font)
 
-        self.style.configure('SmallOrange.TButton',
-                    background='orange',
-                    foreground='black',
+        self.style.configure('SmallBlueish.TButton',
+                    background='#5D6D7E',
+                    foreground='white',
                     font=self.small_button_font)
 
 
@@ -731,10 +731,10 @@ class VocabularyApp:
         
         if scrollbar:
             textbox = scrolledtext.ScrolledText(frame, height=height, bg="#333", fg="white", 
-                                               insertbackground="white", font=label_font)
+                                               insertbackground="white", font=label_font, wrap="word")
         else:
             textbox = tk.Text(frame, height=height, bg="#333", fg="white", 
-                            insertbackground="white", font=label_font)
+                            insertbackground="white", font=label_font, wrap="word")
         
         textbox.pack(fill=tk.X, pady=(5, 0))
         
@@ -754,14 +754,14 @@ class VocabularyApp:
             ttk.Button(
                 button_frame,
                 text="Highlight",
-                style='SmallGreen.TButton',
+                style='SmallWhite.TButton',
                 command=lambda: self.highlight_text(textbox)
             ).pack(side='left', padx=(5, 2), pady=1)
             
             ttk.Button(
                 button_frame,
                 text="Clear Highlight",
-                style='SmallOrange.TButton',
+                style='SmallBlueish.TButton',
                 command=lambda: self.clear_text_highlight(textbox)
             ).pack(side='left', padx=1, pady=1)
         
