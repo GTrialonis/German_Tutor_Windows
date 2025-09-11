@@ -181,6 +181,11 @@ class VocabularyApp:
                     foreground='white',
                     font=self.small_button_font)
 
+        # Add this to your style configurations in __init__
+        self.style.configure('SmallPurple.TButton',
+                    background='#ca74ea',
+                    foreground='black',
+                    font=self.small_button_font)  # Use the same small font as other buttons
 
 
         # Left Section - Vocabulary, Study Text, and Translation Boxes
@@ -222,15 +227,39 @@ class VocabularyApp:
     def prompt_inputbox(self):
         """
         Send user input from the GUI chat input to ChatGPT, maintain conversation history, and display responses.
+        If we're in comprehension test mode, evaluate the answers instead of general chat.
         """
         # Retrieve user input
         content = self.input_textbox.get(1.0, tk.END).strip()
         if not content:
             return
-
-        # Append user message to history
-        # conversation_history should be a list of dicts: {'role': ..., 'content': ...}
-        self.conversation_history.append({"role": "user", "content": content})
+        
+        # Check if we're in comprehension test mode (questions are in the translation box)
+        translation_text = self.translation_textbox.get(1.0, tk.END).strip()
+        
+        if hasattr(self, 'current_comprehension_questions') and self.current_comprehension_questions:
+            # We're in comprehension test mode - evaluate the answers
+            evaluation_prompt = f"""
+            I'm a German language learner. I was asked these comprehension questions:
+            {self.current_comprehension_questions}
+            
+            And I provided these answers:
+            {content}
+            
+            Please evaluate my answers:
+            1. Point out any mistakes I made
+            2. Suggest corrections
+            3. Provide alternative correct answers where applicable
+            4. Give me a score out of 10 based on accuracy and completeness
+            
+            Respond in English to help me understand my mistakes.
+            """
+            
+            # Append to conversation history
+            self.conversation_history.append({"role": "user", "content": evaluation_prompt})
+        else:
+            # Regular chat mode
+            self.conversation_history.append({"role": "user", "content": content})
 
         try:
             # Send full history to ChatCompletion
@@ -245,10 +274,13 @@ class VocabularyApp:
             self.conversation_history.append({"role": "assistant", "content": answer})
 
             # Display in GUI
-            self.ai_responses_textbox.insert(tk.END, f"You: {content} \n\n AI: {answer}")
+            self.ai_responses_textbox.insert(tk.END, f"You: {content} \n\n AI: {answer}\n\n")
 
-            # Clear user input box
-            self.input_textbox.delete(1.0, tk.END)
+            # Clear user input box if we're in comprehension test mode
+            if hasattr(self, 'current_comprehension_questions') and self.current_comprehension_questions:
+                # Clear the comprehension questions after evaluation
+                delattr(self, 'current_comprehension_questions')
+                self.input_textbox.delete(1.0, tk.END)
         except Exception as e:
             # Display error asynchronously
             self.root.after(0, messagebox.showerror, "Chat Error", f"An error occurred: {e}")
@@ -745,27 +777,80 @@ class VocabularyApp:
         if add_buttons:
             # Create button frame for this textbox
             button_frame = tk.Frame(frame, bg="#222")
-            button_frame.pack(fill=tk.X, pady=(0, 2))
-
-            # Create highlight buttons with smaller font
-            small_font = tkFont.Font(family="Helvetica", size=8, weight="normal")  # Add this line
+            button_frame.pack(fill=tk.X, pady=(0, 5))
             
             # Create highlight buttons
             ttk.Button(
                 button_frame,
                 text="Highlight",
-                style='SmallWhite.TButton',
+                style='Green.TButton',
                 command=lambda: self.highlight_text(textbox)
-            ).pack(side='left', padx=(5, 2), pady=1)
+            ).pack(side='left', padx=(10, 3), pady=3)
             
             ttk.Button(
                 button_frame,
                 text="Clear Highlight",
-                style='SmallBlueish.TButton',
+                style='Orange.TButton',
                 command=lambda: self.clear_text_highlight(textbox)
-            ).pack(side='left', padx=1, pady=1)
+            ).pack(side='left', padx=3, pady=3)
+            
+            # Add the "Load Text and Answer Questions" button only for Study Text Box
+            if label_text == "Study Text Box:":
+                ttk.Button(
+                    button_frame,
+                    text="Load Text and Answer Questions",
+                    style='SmallPurple.TButton',
+                    command=self.generate_comprehension_questions
+                ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
         
         return textbox
+    
+    def generate_comprehension_questions(self):
+        """Generate comprehension questions based on the text in the Study Text Box"""
+        # Get the text from the Study Text Box
+        study_text = self.study_textbox.get(1.0, tk.END).strip()
+        
+        if not study_text:
+            messagebox.showwarning("No Text", "Please load some text into the Study Text Box first.")
+            return
+        
+        # Create the prompt for comprehension questions
+        prompt = f"""
+        Based on the following German text, create 2-5 comprehension questions in German. 
+        The questions should test understanding of the text and should be appropriate for a German language learner.
+        
+        Text:
+        {study_text}
+        
+        Please provide only the questions, numbered, without any additional text or explanations.
+        """
+        
+        # Update the conversation history
+        self.conversation_history.append({"role": "user", "content": prompt})
+        
+        try:
+            # Send to OpenAI
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=self.conversation_history,
+                temperature=0.7,
+            )
+            
+            questions = response.choices[0].message.content.strip()
+            
+            # Display questions in the Translation Box
+            self.translation_textbox.delete(1.0, tk.END)
+            self.translation_textbox.insert(tk.END, questions)
+            
+            # Add instructions for the user
+            self.input_textbox.delete(1.0, tk.END)
+            self.input_textbox.insert(tk.END, "Please answer the questions above in German. Type your answers here.")
+            
+            # Store the questions for later evaluation
+            self.current_comprehension_questions = questions
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
 
     def add_highlight_functionality(self):
         """Add highlight functionality to the three main textboxes"""
