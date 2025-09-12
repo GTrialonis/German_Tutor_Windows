@@ -298,10 +298,12 @@ class VocabularyApp:
     # AI creates vocabulary from txt file
     # --------------------
     def create_vocabulary(self): # debug
-        """
-        Load a German-language .txt file, send its content to OpenAI to generate
-        a cleaned vocabulary list (German = English), and display in the GUI.
-        """
+        """AI creates vocabulary from txt file with content warning"""
+        # Use the warning check before proceeding
+        self.check_content_and_warn(self._create_vocabulary_impl)
+
+    def _create_vocabulary_impl(self):
+        """Actual implementation of create_vocabulary (moved from original method)"""
         filename = filedialog.askopenfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
         if not filename:
             return
@@ -367,6 +369,12 @@ class VocabularyApp:
     # AI: Translate study file conditionally
     # --------------------
     def translate_study_text(self):
+        """AI: Translate study file conditionally with content warning"""
+        # Use the warning check before proceeding
+        self.check_content_and_warn(self._translate_study_text_impl)
+
+    def _translate_study_text_impl(self):
+        """Actual implementation of translate_study_text (moved from original method)"""
         filename = filedialog.askopenfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
         if not filename:
             return
@@ -474,15 +482,21 @@ class VocabularyApp:
 
 
     def en_to_de_translation(self):
-        # Get the contents of a vocabulary file (_VOC) to construct sentences
+        """Get the contents of a vocabulary file (_VOC) to construct sentences"""
+        # Use the warning check before proceeding
+        self.check_content_and_warn(self._en_to_de_translation_impl)
+
+    def _en_to_de_translation_impl(self):
+        """Actual implementation of en_to_de_translation"""
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         
         # explain how to engage in this translation practice
-        messagebox.showinfo("Success", f"Study the senteces displayed in the 'Study Text Box. \
-                            Use any other text box to write your translation per \
-                            sentece. \
-                            DO NOT translate into the 'Translation Box' which can display \
-                            the correct translations by clicking 'Free-Hand Translation'")
+        messagebox.showinfo("Success", f"Study the sentences displayed in the 'Study Text Box. \
+                            Use any other text box to write your translation \
+                            for each sentence. \
+                            DO NOT translate into the 'Translation Box' which can display\
+                            the correct translations by clicking 'Free-Hand Translation'.\
+                            You can translate into the top right box.")
 
         if not filename:  # User cancelled the dialog
             return
@@ -507,7 +521,8 @@ class VocabularyApp:
                     "Using ONLY these English words from the dictionary:\n" +
                     "\n".join(word_pairs) +
                     "\n\nCreate exactly 10 complete English sentences. "
-                    "Use at least 2 dictionary words per sentence. "
+                    "Use at least 2 dictionary words \
+                        for each sentence. "
                     "ONLY output the 10 sentences, with one sentence per line. "
                     "Number the sentences but no translations, no explanations, no additional text. "
                     "Example format:\n"
@@ -599,7 +614,7 @@ class VocabularyApp:
             left_frame,
             text="Create sentences from random words in a _VOC file",
             style='Purple.TButton',
-            command=self.en_to_de_translation
+            command=lambda: self.en_to_de_translation()
         ).pack(side='left', padx=3, pady=3)
 
     def create_middle_section(self):
@@ -613,7 +628,7 @@ class VocabularyApp:
 
     # Buttons for Vocabulary Box - pack into vocab_btn_frame
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='Blue.TButton', command=self.load_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='DarkPurple.TButton', command=self.create_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='DarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='Green.TButton', command=self.save_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="Sort-Remove\nDuplicates", style='GoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='Red.TButton', command=self.clear_vocabulary).pack(pady=2) # Adjusted from 17, as group padding will handle overall spacing
@@ -628,7 +643,7 @@ class VocabularyApp:
         ttk.Button(study_btn_frame, text="LOAD-TXT", style='Blue.TButton', command=self.load_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="SAVE-TXT", style='Green.TButton', command=self.save_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="CLR-TXT", style='Red.TButton', command=self.clear_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="Translate file", style='DarkPurple.TButton', command=self.translate_study_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="Translate file", style='DarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
         ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='LightPurple.TButton', command=self.capture_text).pack(pady=2)
 
 
@@ -1064,7 +1079,50 @@ class VocabularyApp:
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Translation Error", f"An error occurred: {e}")
 
-
+    def check_content_and_warn(self, operation_callback, *args):
+        """
+        Check if study or translation boxes have content and warn user before proceeding
+        with the specified operation.
+        
+        Args:
+            operation_callback: The function to call if user confirms
+            *args: Arguments to pass to the operation_callback
+        """
+        # Check if either textbox has content
+        study_content = self.study_textbox.get(1.0, tk.END).strip()
+        translation_content = self.translation_textbox.get(1.0, tk.END).strip()
+        
+        has_content = bool(study_content or translation_content)
+        
+        if has_content:
+            # Create warning message
+            message = (
+                "Warning: One or both text boxes already contain content:\n\n"
+            )
+            
+            if study_content:
+                # Get first 50 chars of study content for preview
+                study_preview = study_content[:50] + "..." if len(study_content) > 50 else study_content
+                message += f"• Study Box: '{study_preview}'\n"
+            
+            if translation_content:
+                # Get first 50 chars of translation content for preview
+                translation_preview = translation_content[:50] + "..." if len(translation_content) > 50 else translation_content
+                message += f"• Translation Box: '{translation_preview}'\n\n"
+            
+            message += "Proceeding may overwrite this content. Continue?"
+            
+            # Show confirmation dialog
+            result = messagebox.askyesno("Content Warning", message, icon="warning")
+            
+            if not result:
+                # User clicked No or Cancel
+                self.status_bar.config(text="Operation cancelled")
+                return False
+        
+        # Either no content or user confirmed
+        operation_callback(*args)
+        return True
 
     def add_notes(self):
         NotesEditor(self.root)
