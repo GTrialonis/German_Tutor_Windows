@@ -202,6 +202,9 @@ class VocabularyApp:
 
         # Create a smaller font for the highlight buttons
         self.small_button_font = tkFont.Font(family="Helvetica", size=8, weight="normal")
+
+        # Update label colors to gold - ADD THIS LINE
+        # self.update_label_colors_to_gold()
     
     # --- REFOCUS THE CURSON INSIDE THE TEST INPUT ---
     def trigger_next_word_and_refocus(self, event=None):
@@ -223,6 +226,9 @@ class VocabularyApp:
             temperature=temperature,
         )
         return resp.choices[0].message.content.strip()
+    
+    # Labels in gold
+   
 
     def prompt_inputbox(self):
         """
@@ -759,12 +765,13 @@ class VocabularyApp:
         frame = tk.Frame(parent, bg="#222")
         frame.pack(fill=tk.X, padx=10, pady=(10, 0))
         
-        label = tk.Label(frame, text=label_text, bg="#222", fg="white", font=label_font)
+        # Changed fg from "white" to "gold" for the label
+        label = tk.Label(frame, text=label_text, bg="#222", fg="gold", font=label_font)
         label.pack(anchor="w")
         
         if scrollbar:
             textbox = scrolledtext.ScrolledText(frame, height=height, bg="#333", fg="white", 
-                                               insertbackground="white", font=label_font, wrap="word")
+                                            insertbackground="white", font=label_font, wrap="word")
         else:
             textbox = tk.Text(frame, height=height, bg="#333", fg="white", 
                             insertbackground="white", font=label_font, wrap="word")
@@ -799,7 +806,7 @@ class VocabularyApp:
             if label_text == "Study Text Box:":
                 ttk.Button(
                     button_frame,
-                    text="Load Text and Answer Questions",
+                    text="Reading Comprehension",
                     style='SmallPurple.TButton',
                     command=self.generate_comprehension_questions
                 ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
@@ -1434,8 +1441,6 @@ class VocabularyApp:
         self.display_random_word()
 
 
-
-
 class NotesEditor:
     def __init__(self, parent):
         self.parent = parent
@@ -1503,6 +1508,7 @@ class NotesEditor:
                 messagebox.showinfo("Saved", f"Notes saved to {filepath}")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
