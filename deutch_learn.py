@@ -573,6 +573,7 @@ class VocabularyApp:
         self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=10, label_font=font, add_buttons=True)
         self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=font, add_buttons=False)
 
+
         # Add the AI prompt buttons
         ttk.Button(
             left_frame,
@@ -783,14 +784,14 @@ class VocabularyApp:
             ttk.Button(
                 button_frame,
                 text="Highlight",
-                style='Green.TButton',
+                style='SmallWhite.TButton',
                 command=lambda: self.highlight_text(textbox)
             ).pack(side='left', padx=(10, 3), pady=3)
             
             ttk.Button(
                 button_frame,
                 text="Clear Highlight",
-                style='Orange.TButton',
+                style='SmallBlueish.TButton',
                 command=lambda: self.clear_text_highlight(textbox)
             ).pack(side='left', padx=3, pady=3)
             
