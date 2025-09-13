@@ -677,7 +677,13 @@ class VocabularyApp:
         # right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True) # Added expand=True back
 
         # Example Sentences
-        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", True, height=8)
+        self.example_sentences_textbox = self.create_labeled_textbox(
+            right_frame, 
+            "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", 
+            True, 
+            height=8,
+            label_font=self.left_section_font  # Add this parameter
+)
 
         # New Input Box for Glosbe Search
         self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 13))
@@ -744,7 +750,13 @@ class VocabularyApp:
         ttk.Button(dict_btn_frame, text="Clear Input", style='Orange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
-        self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=8, label_font="Helvetica")
+        self.ai_responses_textbox = self.create_labeled_textbox(
+            right_frame, 
+            "AI Responses from prompt on the left side", 
+            True, 
+            height=8, 
+            label_font=self.left_section_font
+)
 
 
     def create_labeled_inputbox(self, parent, label_text, width=80, height=20, wrap=tk.WORD, label_font=None):
