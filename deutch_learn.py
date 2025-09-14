@@ -940,7 +940,7 @@ class VocabularyApp:
     def load_vocabulary(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 
-        if filename:
+        if filename.endswith("_VOC.txt") or "_VOC.txt" in filename:
             self.current_voc_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
@@ -949,6 +949,15 @@ class VocabularyApp:
                 self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
                 self.load_current_voc += 1
                 self.load_test_file()
+        else:
+            messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a vocabulary file.\n\n"
+            "Please select a file that ends with '_VOC.txt'.\n\n"
+        )
+            return
+
+
 
 
     # -------------- REPEAT CHANGES IN OTHER TWO TEXTBOX SAVES ----
@@ -1058,10 +1067,17 @@ class VocabularyApp:
     def load_study_text(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         self.current_study_file = filename  # Save the loaded filename
-        if filename:
+        if filename.endswith("_TXT.txt") or "_TXT.txt" in filename:
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.study_textbox.insert(tk.END, content)
+        else:
+            messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a study text file.\n\n"
+            "Please select a file that ends with '_TXT.txt'.\n\n"
+        )
+            return
 
 
     def clear_study_text(self):
@@ -1142,10 +1158,17 @@ class VocabularyApp:
     def load_translation(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         self.current_translated_file = filename  # Save the loaded filename
-        if filename:
+        if filename.endswith("_TRA.txt") or "_TRA.txt" in filename:
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.translation_textbox.insert(tk.END, content)
+        else:
+            messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a translation text file.\n\n"
+            "Please select a file that ends with '_TRA.txt'.\n\n"
+        )
+            return
 
 
     def clear_translation(self):
