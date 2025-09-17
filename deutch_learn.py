@@ -170,6 +170,16 @@ class VocabularyApp:
                             foreground='black',
                             font=self.left_section_font)
         
+        self.style.configure('WhiteBlue.TButton', # For SORT, NOTES, Flip Sentences
+                            background="#AACCC6",
+                            foreground='black', # Check your specific fg for these
+                            font=self.left_section_font)
+        
+        self.style.configure('DarkOrange.TButton', # For SORT, NOTES, Flip Sentences
+                            background="#AA5200",
+                            foreground='black', # Check your specific fg for these
+                            font=self.left_section_font)
+        
         # In your __init__ method, add these style definitions
         self.style.configure('SmallWhite.TButton',
                     background='#7B7D7D',
@@ -677,16 +687,10 @@ class VocabularyApp:
         # right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True) # Added expand=True back
 
         # Example Sentences
-        self.example_sentences_textbox = self.create_labeled_textbox(
-            right_frame, 
-            "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", 
-            True, 
-            height=8,
-            label_font=self.left_section_font  # Add this parameter
-)
+        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", True, height=8)
 
         # New Input Box for Glosbe Search
-        self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 13))
+        self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 12))
         self.glosbe_search_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Buttons for Example Sentences
@@ -706,9 +710,11 @@ class VocabularyApp:
 
         btn_frame2 = tk.Frame(test_frame, bg="#222")
         btn_frame2.pack(fill=tk.X)
-        ttk.Button(btn_frame2, text="Choose other '_VOC.txt' File", style='Blue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Choose '_VOC.txt' File", style='Blue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Flip Words", style='GoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Clear Test", style='Orange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Revise en-de words", style='WhiteBlue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Revise de-en words", style='DarkOrange.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
         self.test_filename_label.pack(anchor='w')
@@ -750,13 +756,7 @@ class VocabularyApp:
         ttk.Button(dict_btn_frame, text="Clear Input", style='Orange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
-        self.ai_responses_textbox = self.create_labeled_textbox(
-            right_frame, 
-            "AI Responses from prompt on the left side", 
-            True, 
-            height=8, 
-            label_font=self.left_section_font
-)
+        self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=8, label_font="Helvetica")
 
 
     def create_labeled_inputbox(self, parent, label_text, width=80, height=20, wrap=tk.WORD, label_font=None):
@@ -787,7 +787,7 @@ class VocabularyApp:
 
         return inputbox  # Return the widget for later access
 
-    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font=None, add_buttons=False):
+    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", add_buttons=False):
         """Create a labeled textbox with optional scrollbar and optional highlight buttons"""
         frame = tk.Frame(parent, bg="#222")
         frame.pack(fill=tk.X, padx=10, pady=(10, 0))
@@ -940,7 +940,7 @@ class VocabularyApp:
     def load_vocabulary(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 
-        if filename.endswith("_VOC.txt") or "_VOC.txt" in filename:
+        if filename:
             self.current_voc_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
@@ -949,15 +949,6 @@ class VocabularyApp:
                 self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
                 self.load_current_voc += 1
                 self.load_test_file()
-        else:
-            messagebox.showwarning(
-            "Invalid File Type",
-            "The selected file is not a vocabulary file.\n\n"
-            "Please select a file that ends with '_VOC.txt'.\n\n"
-        )
-            return
-
-
 
 
     # -------------- REPEAT CHANGES IN OTHER TWO TEXTBOX SAVES ----
@@ -1067,17 +1058,10 @@ class VocabularyApp:
     def load_study_text(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         self.current_study_file = filename  # Save the loaded filename
-        if filename.endswith("_TXT.txt") or "_TXT.txt" in filename:
+        if filename:
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.study_textbox.insert(tk.END, content)
-        else:
-            messagebox.showwarning(
-            "Invalid File Type",
-            "The selected file is not a study text file.\n\n"
-            "Please select a file that ends with '_TXT.txt'.\n\n"
-        )
-            return
 
 
     def clear_study_text(self):
@@ -1158,17 +1142,10 @@ class VocabularyApp:
     def load_translation(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         self.current_translated_file = filename  # Save the loaded filename
-        if filename.endswith("_TRA.txt") or "_TRA.txt" in filename:
+        if filename:
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.translation_textbox.insert(tk.END, content)
-        else:
-            messagebox.showwarning(
-            "Invalid File Type",
-            "The selected file is not a translation text file.\n\n"
-            "Please select a file that ends with '_TRA.txt'.\n\n"
-        )
-            return
 
 
     def clear_translation(self):
