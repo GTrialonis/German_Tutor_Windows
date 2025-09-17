@@ -346,7 +346,7 @@ class VocabularyApp:
 
             General:
 
-            Do not precede any entry with markup, numbers, bullets, hyphens, or any other characters. Each entry begins with the German word itself.
+            DO NOT precede any entry with markup, numbers, bullets, hyphens, or any other characters. Each entry begins with the German word itself.
 
             Each entry must be on a new line.
 
