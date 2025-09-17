@@ -325,33 +325,69 @@ class VocabularyApp:
             configure_openai()
 
             prompt = (
-            """I have uploaded a text file in the German language and I want you to process it as follows:
-            1) Make a list of all of the words in the text file.
-            2) Remove these words: der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, \
-            Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, \
-                er, sie, es, wir, ihr, sie, Sie, in, an, auf, unter, über, vor, hinter, neben, zwischen, mit, nach, \
-                bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich \
-                uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird.
-            3) Also remove these: Frühling, Sommer, Herbst, Winter
-            4) Output the response without using Markup or numbers before each word.
-            5) Translate the german words into the english language as instructed below but limit your responses \
-                to NOT more than THREE english translations. \
-                If the german word is a NOUN, start by displaying that word in SINGULAR form followed by \
-                a comma and then by the article, comma again and then the PLURAL form in brackets. \
-                For example, if you encounter 'Buches', display ONLY the following: Buch, das, [Bücher, die] = book, volume, ledger.
-                If the german word is a verb in any form or case, display first the base form. \
-                For example: if you encounter in the text the word'steht', DO NOT start by displaying 'steht' again, rather start by displaying \
-                the base form 'stehen' followed by a comma and in brackets the other two forms (past and past participle), for example \
-                'stehen, [stand, gestanden] = to stand, to rise.\
-                Similarly, if you encounter in the text verbs in the past participle, for example 'abgeschoben',\
-                then DO NOT display the past participle but the infinitive, for example, 'abschieben', followed by the past tense \
-                and the past participle in brackets, ['schob ab', 'abgeschoben'], followed by the equal sign (=) and the interpretation in english.
-                If you encounter a regular verb, for example 'legt', you DO NOT display 'legt' again, rather display: legen, [legte, gelegt] = to place \
-                Similarly, if you encounter in the text an irregular verb, e.g. 'springst' you DO NOT display 'springst'again, rather you display \
-                spriengen, [sprang, gesprungen] = to jump, to leap.
-                For ALL VERBS make sure to INCLUDE the word 'to' before the english meaning, for example: \
-                gehen, [ging, geganden] = to go, to walk.
-                        """
+            """You are a German-English linguistic analysis tool. Your task is to process a German text, filter it based on a custom stopword list, and then generate a formatted vocabulary list with specific grammatical information and English translations.
+
+            Objective:
+            Analyze the provided German text file to create a unique vocabulary list. The order of the words in the final output must match the order in which the first instance of each word appeared in the source text. Each entry in the list must be formatted according to its part of speech (noun, verb, adjective, or other) and translated into English.
+
+            Processing Workflow:
+
+            Tokenize and Normalize: Read the entire text. Break it down into individual words (tokens). Treat all punctuation (e.g., , . ! ? ; : " ') as delimiters and remove it from the words.
+
+            Filter Stopwords: Create a list of all words from the text, maintaining their original order of appearance. From this list, remove any word that appears in the stopword list below. Then, create a final unique list, keeping only the first occurrence of each word.
+
+            Stopword List: der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, er, sie, es, wir, ihr, Sie, in, an, auf, unter, über, vor, hinter, neben, zwischen, mit, nach, bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich, uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird, Frühling, Sommer, Herbst, Winter
+
+            Lemmatize and Analyze: For each unique word in the ordered list, determine its base form (lemma) and its part of speech (noun, verb, adjective, adverb, etc.).
+
+            Format and Translate: Generate the final output list. Follow the output formatting rules below precisely.
+
+            Output Formatting Rules:
+
+            General:
+
+            Do not precede any entry with markup, numbers, bullets, hyphens, or any other characters. Each entry begins with the German word itself.
+
+            Each entry must be on a new line.
+
+            Provide a maximum of THREE English translations for each word.
+
+            Do not sort the final list. The order of words must correspond to the order in which their first instance appeared in the original text.
+
+            For Nouns:
+
+            From any form of a noun found in the text (e.g., "Buches"), identify its singular, nominative form.
+
+            Format: Singular Form, Article, [Plural Form, Plural Article] = translation1, translation2, translation3
+
+            Example: Buch, das, [Bücher, die] = book, volume, ledger
+
+            For Verbs:
+
+            From any form of a verb found in the text (e.g., "spricht"), identify its infinitive (base form).
+
+            Format: Infinitive, [Präteritum, Perfekt] = to translation1, to translation2, to translation3
+
+            Always include "to" before the English translations.
+
+            Example: sprechen, [sprach, gesprochen] = to speak, to talk
+
+            For Adjectives:
+
+            From any form of an adjective, identify its positive (base) form.
+
+            Format: Positive Form, [Comparative Form, Superlative Form] = translation1, translation2, translation3
+
+            Example: schnell, [schneller, schnellsten] = fast, quick, rapid
+
+            For Adverbs and All Other Word Types:
+
+            Display the word in its base/dictionary form.
+
+            Format: German Word = translation1, translation2, translation3
+
+            Example: oft = often, frequently
+                                    """
             )
 
             # Call the ChatCompletion API
