@@ -356,9 +356,9 @@ class VocabularyApp:
 
             For Nouns:
 
-            From any form of a noun found in the text (e.g., "Buches"), identify its singular, nominative form.
+            From any form of a noun found in the text (e.g., "Buches"), identify its SINGULAR, NOMINATIVE form.
 
-            Format: Singular Form, Article, [Plural Form, Plural Article] = translation1, translation2, translation3
+            Format: SINGULAR Form, Article, [Plural Form, Plural Article] = translation1, translation2, translation3
 
             Example: Buch, das, [Bücher, die] = book, volume, ledger
 
@@ -726,7 +726,7 @@ class VocabularyApp:
         self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", True, height=8)
 
         # New Input Box for Glosbe Search
-        self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 12))
+        self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.glosbe_search_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Buttons for Example Sentences
@@ -749,8 +749,7 @@ class VocabularyApp:
         ttk.Button(btn_frame2, text="Choose '_VOC.txt' File", style='Blue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Flip Words", style='GoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Clear Test", style='Orange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame2, text="Revise en-de words", style='WhiteBlue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame2, text="Revise de-en words", style='DarkOrange.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
+    
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
         self.test_filename_label.pack(anchor='w')
@@ -976,7 +975,7 @@ class VocabularyApp:
     def load_vocabulary(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 
-        if filename:
+        if filename.endswith("_VOC.txt") or "_VOC.txt" in filename:
             self.current_voc_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
@@ -985,6 +984,13 @@ class VocabularyApp:
                 self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
                 self.load_current_voc += 1
                 self.load_test_file()
+        else:
+            messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a vocabulary file.\n\n"
+            "Please select a file that ends with '_VOC.txt'.\n\n"
+        )
+            return
 
 
     # -------------- REPEAT CHANGES IN OTHER TWO TEXTBOX SAVES ----
@@ -1093,11 +1099,20 @@ class VocabularyApp:
 
     def load_study_text(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
-        self.current_study_file = filename  # Save the loaded filename
-        if filename:
+
+        if filename.endswith("_TXT.txt") or "_TXT.txt" in filename:
+            self.current_study_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.study_textbox.insert(tk.END, content)
+        
+        else:
+            messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a vocabulary file.\n\n"
+            "Please select a file that ends with '_TXT.txt'.\n\n"
+        )
+            return
 
 
     def clear_study_text(self):
@@ -1177,11 +1192,20 @@ class VocabularyApp:
 
     def load_translation(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
-        self.current_translated_file = filename  # Save the loaded filename
-        if filename:
+
+        if filename.endswith("_TRA.txt") or "_TRA.txt" in filename:
+            self.current_translated_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.translation_textbox.insert(tk.END, content)
+
+        else:
+            messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a vocabulary file.\n\n"
+            "Please select a file that ends with '_TRA.txt'.\n\n"
+        )
+            return
 
 
     def clear_translation(self):
