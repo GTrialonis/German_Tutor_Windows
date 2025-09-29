@@ -807,6 +807,7 @@ class VocabularyApp:
         tk.Label(right_frame, text="Search word using AI or Langenscheid online dictionary", fg="gold", bg="#222").pack(anchor='w', pady=5)
         self.dictionary_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.dictionary_entry.pack(fill=tk.X)
+        self.dictionary_entry.bind("<Return>", self.search_own_vocab) # <--------------- new
 
         dict_btn_frame = tk.Frame(right_frame, bg="#222")
         dict_btn_frame.pack(fill=tk.X)
@@ -1238,9 +1239,9 @@ class VocabularyApp:
         self.translation_textbox.delete(1.0, tk.END)
     
 
-    def search_own_vocab(self):
+    def search_own_vocab(self, event=None):
         # Get the word to search from the input field
-        search_word = self.dictionary_entry.get().strip().lower()  # Assuming you have an input_field
+        search_word = self.dictionary_entry.get().strip().lower()
         
         # Get the vocabulary content from the textbox
         vocab_content = self.vocabulary_textbox.get("1.0", tk.END)
