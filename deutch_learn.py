@@ -534,57 +534,82 @@ class VocabularyApp:
 
     def _en_to_de_translation_impl(self):
         """Actual implementation of en_to_de_translation"""
-        filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        filename = None
+        word_pairs = []
         
-        # explain how to engage in this translation practice
-        messagebox.showinfo("Success", f"Study the sentences displayed in the 'Study Text Box. \
-                            Use any other text box to write your translation \
-                            for each sentence. \
-                            DO NOT translate into the 'Translation Box' which can display\
-                            the correct translations by clicking 'Free-Hand Translation'.\
-                            You can translate into the top right box.")
-
-        if not filename:  # User cancelled the dialog
+        # First, check if we already have vocabulary loaded in the textbox
+        vocab_content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+        
+        if vocab_content and self.vocabulary:  # Check if vocabulary textbox has content
+            print("Using existing vocabulary from textbox")
+            word_pairs = [line.strip() for line in vocab_content.splitlines() if line.strip()]
+        else:
+            # No vocabulary loaded, ask user to select a file
+            filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+            
+            if not filename:  # User cancelled the dialog
+                return
+                
+            if not (filename.endswith("_VOC.txt") or "_VOC.txt" in filename):
+                messagebox.showwarning(
+                    "Invalid File Type",
+                    "Please select a vocabulary file with '_VOC.txt' in the filename.\n\n"
+                    f"Selected file: {os.path.basename(filename)}"
+                )
+                return
+                
+            print(f"Selected file: {filename}")
+            try:
+                with open(filename, 'r', encoding='utf-8-sig') as file:
+                    content = file.read()
+                    word_pairs = [line.strip() for line in content.splitlines() if line.strip()]
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to process file: {str(e)}", parent=self.root)
+                return
+        
+        # Now create sentences from the word pairs
+        if not word_pairs:
+            messagebox.showwarning("Empty Vocabulary", "The vocabulary file or textbox is empty.")
             return
         
-        try:
-            with open(filename, 'r', encoding='utf-8-sig') as file:
-                content = file.read()
-                word_pairs = [line.strip() for line in content.splitlines() if line.strip()]
-                
+        # explain how to engage in this translation practice
+        messagebox.showinfo("Instructions", 
+                        "Study the sentences displayed in the 'Study Text Box'.\n\n"
+                        "Use any other text box to write your translation per sentence.\n\n"
+                        "DO NOT translate into the 'Translation Box' which can display "
+                        "the correct translations by clicking 'Free-Hand Translation'")
+        
         # Add a bit of random context to encourage varied responses
-                variation_hints = [
-                    "Try to be creative and use different contexts.",
-                    "Give fresh and varied examples, avoid common textbook ones.",
-                    "Use different sentence structures or scenarios than before.",
-                    "Pick examples from different domains like travel, food, or work.",
-                    "Avoid repeating any previous examples."
-                ]
-                variation_hint = random.choice(variation_hints)
+        variation_hints = [
+            "Try to be creative and use different contexts.",
+            "Give fresh and varied examples, avoid common textbook ones.",
+            "Use different sentence structures or scenarios than before.",
+            "Pick examples from different domains like travel, food, or work.",
+            "Avoid repeating any previous examples."
+        ]
+        variation_hint = random.choice(variation_hints)
 
-                # Build the specific prompt
-                prompt = (
-                    "Using ONLY these English words from the dictionary:\n" +
-                    "\n".join(word_pairs) +
-                    "\n\nCreate exactly 10 complete English sentences. "
-                    "Use at least 2 dictionary words \
-                        for each sentence. "
-                    "ONLY output the 10 sentences, with one sentence per line. "
-                    "Number the sentences but no translations, no explanations, no additional text. "
-                    "Example format:\n"
-                    "1) The cat sat on the mat\n"
-                    "2) She enjoys reading books\n"
-                    "... [8 more sentences]"
-                    f"{variation_hint}"
-                )
-                
-                sentences = self.ask_chatgpt(prompt, model_name="gpt-4o", temperature=0.8)
-                
-                self.study_textbox.delete(1.0, tk.END)
-                self.study_textbox.insert(tk.END, sentences)
-                
+        # Build the specific prompt
+        prompt = (
+            "Using ONLY these English words from the dictionary:\n" +
+            "\n".join(word_pairs) +
+            "\n\nCreate exactly 10 complete English sentences. "
+            "Use at least 2 dictionary words per sentence. "
+            "ONLY output the 10 sentences, with one sentence per line. "
+            "Number the sentences but no translations, no explanations, no additional text. "
+            "Example format:\n"
+            "1) The cat sat on the mat\n"
+            "2) She enjoys reading books\n"
+            "... [8 more sentences]"
+            f"{variation_hint}"
+        )
+        
+        try:
+            sentences = self.ask_chatgpt(prompt, model_name="gpt-4o", temperature=0.8)
+            self.study_textbox.delete(1.0, tk.END)
+            self.study_textbox.insert(tk.END, sentences)
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to process file: {str(e)}", parent=self.root)
+            messagebox.showerror("Error", f"Failed to generate sentences: {str(e)}", parent=self.root)
 
 
     # --------------------
@@ -658,7 +683,7 @@ class VocabularyApp:
 
         ttk.Button(
             left_frame,
-            text="Create sentences from random words in a _VOC file",
+            text="Create sentences from current _VOC file or select other _VOC.txt",
             style='Purple.TButton',
             command=lambda: self.en_to_de_translation()
         ).pack(side='left', padx=3, pady=3)
