@@ -88,20 +88,20 @@ class VocabularyApp:
         self.style = ttk.Style()
         # Define a custom style for a purple button
         self.style.theme_use('default') # Ensure a base theme is used
-        self.style.configure('Purple.TButton',
+        self.style.configure('SmallPurple.TButton',
                             background="#ca74ea", # Your desired background color
                             foreground='black',   # Your desired text color
-                            font=self.left_section_font) # Use your defined font object
+                            font=self.small_button_font) # Use your defined font object
         # Define a custom style for a red button
-        self.style.configure('Red.TButton',
+        self.style.configure('SmallRed.TButton',
                             background='#AA0000', # Your desired background color
                             foreground='white',   # Your desired text color
-                            font=self.left_section_font) # Use your defined font object
+                            font=self.small_button_font) # Use your defined font object
         # Define a custom style for a green button
-        self.style.configure('Green.TButton',
+        self.style.configure('SmallGreen.TButton',
                             background='#008844', # Your desired background color
                             foreground='black',   # Your desired text color
-                            font=self.left_section_font) # Use your defined font object
+                            font=self.small_button_font) # Use your defined font object
         # ... you'll need to define similar styles for all your button colors
 
         # Inside your __init__(self, root) method:
@@ -110,75 +110,75 @@ class VocabularyApp:
         self.style.theme_use('default') # Ensure a base theme is used
 
         # Define styles for all your button colors
-        self.style.configure('DarkPurple.TButton',
+        self.style.configure('SmallDarkPurple.TButton',
                             background='#ca74ea',
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('Blue.TButton',
+        self.style.configure('SmallBlue.TButton',
                             background="#73A2D0",
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('Green.TButton',
+        self.style.configure('SmallGreen.TButton',
                             background='#008844',
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('Red.TButton',
+        self.style.configure('SmallRed.TButton',
                             background='#AA0000',
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('GoldBrown.TButton', # For SORT, NOTES, Flip Sentences
+        self.style.configure('SmallGoldBrown.TButton', # For SORT, NOTES, Flip Sentences
                             background='#AA8800',
                             foreground='black', # Check your specific fg for these
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('LightPurple.TButton', # For Free-Hand Translation
+        self.style.configure('SmallLightPurple.TButton', # For Free-Hand Translation
                             background='#cbb0e0',
                             foreground='black', # Check your specific fg for this
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('Orange.TButton', # For Clear Input, Clear Test
+        self.style.configure('SmallOrange.TButton', # For Clear Input, Clear Test
                             background='orange',
                             foreground='black', # Check your specific fg for these
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('DarkBlue.TButton', # For Next Word
+        self.style.configure('SmallDarkBlue.TButton', # For Next Word
                             background='#005588',
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('GrayBlue.TButton', # For Langenscheidt
+        self.style.configure('SmallGrayBlue.TButton', # For Langenscheidt
                             background="#9DC1E4",
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('DarkOlive.TButton', # For Search OWN vocab.
+        self.style.configure('SmallDarkOlive.TButton', # For Search OWN vocab.
                             background="#95C068",
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
 
-        self.style.configure('OliveGreen.TButton', # For Glosbe Examples
+        self.style.configure('SmallOliveGreen.TButton', # For Glosbe Examples
                             background='#95946A',
                             foreground='black',
-                            font=self.left_section_font)
+                            font=self.small_button_font)
         
-        self.style.configure('Greenish.TButton', # For Glosbe Examples
+        self.style.configure('SmallGreenish.TButton', # For Glosbe Examples
                             background="#AABD7E",
                             foreground='black',
                             font=self.left_section_font)
         
-        self.style.configure('WhiteBlue.TButton', # For SORT, NOTES, Flip Sentences
+        self.style.configure('SmallWhiteBlue.TButton', # For SORT, NOTES, Flip Sentences
                             background="#AACCC6",
                             foreground='black', # Check your specific fg for these
-                            font=self.left_section_font)
+                            font=self.small_button_font)
         
-        self.style.configure('DarkOrange.TButton', # For SORT, NOTES, Flip Sentences
+        self.style.configure('SmallDarkOrange.TButton', # For SORT, NOTES, Flip Sentences
                             background="#AA5200",
                             foreground='black', # Check your specific fg for these
-                            font=self.left_section_font)
+                            font=self.small_button_font)
         
         # In your __init__ method, add these style definitions
         self.style.configure('SmallWhite.TButton',
@@ -670,27 +670,27 @@ class VocabularyApp:
         ttk.Button(
             left_frame,
             text="Prompt AI",
-            style='Purple.TButton',
+            style='SmallPurple.TButton',
             command=self.prompt_inputbox
         ).pack(side='left', padx=(10, 3), pady=3)
 
         ttk.Button(
             left_frame,
             text="Clear Prompt",
-            style='Red.TButton',
+            style='SmallRed.TButton',
             command=self.clear_input_textbox
         ).pack(side='left', padx=3, pady=3)
 
         ttk.Button(
             left_frame,
             text="Create sentences from current _VOC file or select other _VOC.txt",
-            style='Purple.TButton',
+            style='SmallPurple.TButton',
             command=lambda: self.en_to_de_translation()
         ).pack(side='left', padx=3, pady=3)
 
     def create_middle_section(self):
         middle_frame = tk.Frame(self.root, bg="#222")
-        middle_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=18)
+        middle_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=12)
         
     # --- Group 1: Vocabulary Buttons ---
     # Create a frame for the Vocabulary buttons
@@ -698,11 +698,11 @@ class VocabularyApp:
         vocab_btn_frame.pack(pady=(0, 25)) # <--- TOP & BOTTOM PADDING for this GROUP (e.g., 25 pixels at bottom)
 
     # Buttons for Vocabulary Box - pack into vocab_btn_frame
-        ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='Blue.TButton', command=self.load_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='DarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='Green.TButton', command=self.save_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="Sort-Remove\nDuplicates", style='GoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="CLR-VOC", style='Red.TButton', command=self.clear_vocabulary).pack(pady=2) # Adjusted from 17, as group padding will handle overall spacing
+        ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='SmallBlue.TButton', command=self.load_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="Sort-Remove\nDuplicates", style='SmallGoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2) # Adjusted from 17, as group padding will handle overall spacing
 
 
     # --- Group 2: Study Text Buttons ---
@@ -711,11 +711,12 @@ class VocabularyApp:
         study_btn_frame.pack(pady=(15, 15)) # <--- TOP & BOTTOM PADDING for this GROUP
 
     # Buttons for Study Text Box - pack into study_btn_frame
-        ttk.Button(study_btn_frame, text="LOAD-TXT", style='Blue.TButton', command=self.load_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="SAVE-TXT", style='Green.TButton', command=self.save_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="CLR-TXT", style='Red.TButton', command=self.clear_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="Translate file", style='DarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
-        ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='LightPurple.TButton', command=self.capture_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="LOAD-TXT", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
+        ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='SmallLightPurple.TButton', command=self.capture_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="  LISTEN to\nthe Study Text", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=2) # <---- new
 
 
     # --- Group 3: Translation Buttons ---
@@ -724,10 +725,10 @@ class VocabularyApp:
         translation_btn_frame.pack(pady=(25, 0)) # <--- TOP PADDING for this GROUP
 
     # Buttons for Translation Box - pack into translation_btn_frame
-        ttk.Button(translation_btn_frame, text="LOAD-TRA", style='Blue.TButton', command=self.load_translation).pack(pady=2) # Adjusted from 20
-        ttk.Button(translation_btn_frame, text="SAVE-TRA", style='Green.TButton', command=self.save_translation).pack(pady=2)
-        ttk.Button(translation_btn_frame, text="CLR-TRA", style='Red.TButton', command=self.clear_translation).pack(pady=2) # Adjusted from 15
-        ttk.Button(translation_btn_frame, text="NOTES", style='GoldBrown.TButton', command=self.add_notes).pack(pady=2) # Adjusted from 15
+        ttk.Button(translation_btn_frame, text="LOAD-TRA", style='SmallBlue.TButton', command=self.load_translation).pack(pady=2) # Adjusted from 20
+        ttk.Button(translation_btn_frame, text="SAVE-TRA", style='SmallGreen.TButton', command=self.save_translation).pack(pady=2)
+        ttk.Button(translation_btn_frame, text="CLR-TRA", style='SmallRed.TButton', command=self.clear_translation).pack(pady=2) # Adjusted from 15
+        ttk.Button(translation_btn_frame, text="NOTES", style='SmallGoldBrown.TButton', command=self.add_notes).pack(pady=2) # Adjusted from 15
         
         # --- NEW Group 4: AI Response Buttons (Middle Section) ---
         # Create a separate frame for these 4 buttons
@@ -736,10 +737,10 @@ class VocabularyApp:
         ai_responses_middle_btn_frame.pack(pady=(40, 0)) # <--- Adjust this top padding for desired space
 
         # Buttons for AI Responses - pack into ai_responses_middle_btn_frame
-        ttk.Button(ai_responses_middle_btn_frame, text="Save AI\nResponses", style='DarkPurple.TButton', command=self.save_ai_responses).pack(pady=2)
-        ttk.Button(ai_responses_middle_btn_frame, text="Append AI\nResponses", style='DarkPurple.TButton', command=self.append_ai_responses_to_file).pack(pady=2)
-        ttk.Button(ai_responses_middle_btn_frame, text="Copy AI \nResponses", style='DarkPurple.TButton', command=self.copy_ai_responses).pack(pady=2)
-        ttk.Button(ai_responses_middle_btn_frame, text="Clear AI\nResponses", style='Red.TButton', command=self.clear_ai_responses_textbox).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Save AI\nResponses", style='SmallDarkPurple.TButton', command=self.save_ai_responses).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Append AI\nResponses", style='SmallDarkPurple.TButton', command=self.append_ai_responses_to_file).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Copy AI \nResponses", style='SmallDarkPurple.TButton', command=self.copy_ai_responses).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Clear AI\nResponses", style='SmallRed.TButton', command=self.clear_ai_responses_textbox).pack(pady=2)
     
 
     def create_right_section(self):
@@ -757,12 +758,12 @@ class VocabularyApp:
         # Buttons for Example Sentences
         btn_frame = tk.Frame(right_frame, bg="#222")
         btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="AI Examples", style='DarkPurple.TButton', command=self.fetch_ai_examples).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Glosbe Examples", style='OliveGreen.TButton', command=self.fetch_glosbe_examples).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Load Examples", style='Blue.TButton', command=self.load_examples).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Append", style='Green.TButton', command=self.save_examples).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Clear Input", style='Orange.TButton', command=self.clear_examples_input).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Clear", style='Red.TButton', command=self.clear_example_sentences).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="AI Examples", style='SmallDarkPurple.TButton', command=self.fetch_ai_examples).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Glosbe Examples", style='SmallOliveGreen.TButton', command=self.fetch_glosbe_examples).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Load Examples", style='SmallBlue.TButton', command=self.load_examples).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Append", style='SmallGreen.TButton', command=self.save_examples).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_examples_input).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Clear", style='SmallRed.TButton', command=self.clear_example_sentences).pack(side=tk.LEFT, padx=5)
 
         # Vocabulary Test Section
         test_frame = tk.Frame(right_frame, bg="#222")
@@ -771,9 +772,9 @@ class VocabularyApp:
 
         btn_frame2 = tk.Frame(test_frame, bg="#222")
         btn_frame2.pack(fill=tk.X)
-        ttk.Button(btn_frame2, text="Choose '_VOC.txt' File", style='Blue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame2, text="Flip Words", style='GoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame2, text="Clear Test", style='Orange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Choose '_VOC.txt' File", style='SmallBlue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Flip Words", style='SmallGoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Clear Test", style='SmallOrange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
     
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
@@ -793,9 +794,9 @@ class VocabularyApp:
 
         answer_frame = tk.Frame(right_frame, bg="#222")
         answer_frame.pack(fill=tk.X)
-        ttk.Button(answer_frame, text="Next Word", style='Blue.TButton', command=self.next_word).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(answer_frame, text="Clear Input", style='Orange.TButton', command=self.clear_input).pack(side=tk.LEFT, padx=5)
-        ttk.Button(answer_frame, text="Revise Mistakes", style='Greenish.TButton', command=self.load_revision_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(answer_frame, text="Next Word", style='SmallBlue.TButton', command=self.next_word).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(answer_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_input).pack(side=tk.LEFT, padx=5)
+        ttk.Button(answer_frame, text="Revise Mistakes", style='SmallGreenish.TButton', command=self.load_revision_file).pack(side=tk.LEFT, padx=5)
         tk.Label(answer_frame, text="Score:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
         self.score_label = tk.Label(answer_frame, text="0%", fg="white", bg="#222")
         self.score_label.pack(side=tk.LEFT)
@@ -811,10 +812,10 @@ class VocabularyApp:
 
         dict_btn_frame = tk.Frame(right_frame, bg="#222")
         dict_btn_frame.pack(fill=tk.X)
-        ttk.Button(dict_btn_frame, text="AI word translation", style='DarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(dict_btn_frame, text="Langenscheidt", style='GrayBlue.TButton', command=self.fetch_langenscheidt).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(dict_btn_frame, text="Search vocabulary (Current).", style='DarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(dict_btn_frame, text="Clear Input", style='Orange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
+        ttk.Button(dict_btn_frame, text="AI word translation", style='SmallDarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="Langenscheidt", style='SmallGrayBlue.TButton', command=self.fetch_langenscheidt).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="Search vocabulary (Current).", style='SmallDarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
         self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=8, label_font="Helvetica")
@@ -894,7 +895,15 @@ class VocabularyApp:
             if label_text == "Study Text Box:":
                 ttk.Button(
                     button_frame,
-                    text="Reading Comprehension",
+                    text="READING Comprehension",
+                    style='SmallPurple.TButton',
+                    command=self.generate_comprehension_questions
+                ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
+            
+            if label_text == "Study Text Box:":
+                ttk.Button(
+                    button_frame,
+                    text="LISTENING Comprehension",
                     style='SmallPurple.TButton',
                     command=self.generate_comprehension_questions
                 ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
