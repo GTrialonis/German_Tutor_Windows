@@ -192,10 +192,10 @@ class VocabularyApp:
                     font=self.small_button_font)
 
         # Add this to your style configurations in __init__
-        self.style.configure('SmallPurple.TButton',
-                    background='#ca74ea',
-                    foreground='black',
-                    font=self.small_button_font)  # Use the same small font as other buttons
+        # self.style.configure('SmallPurple.TButton',
+        #             background='#ca74ea',
+        #             foreground='black',
+        #             font=self.small_button_font)  # Use the same small font as other buttons
 
 
         # Left Section - Vocabulary, Study Text, and Translation Boxes
