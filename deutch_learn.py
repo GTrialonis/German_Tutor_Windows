@@ -6,9 +6,15 @@ import random
 import requests
 from bs4 import BeautifulSoup
 import tkinter.font as tkFont
-import os, sys
-import subprocess
+import os
+import threading
+from gtts import gTTS
+import pygame
+import tempfile
+import time
 
+# Add these imports at the top of your file
+pygame.mixer.init()
 # --- Configuration ---
 from dotenv import load_dotenv
 
@@ -104,8 +110,13 @@ class VocabularyApp:
                             font=self.small_button_font) # Use your defined font object
         # ... you'll need to define similar styles for all your button colors
 
-        # Inside your __init__(self, root) method:
+        # Add these variables for text-to-speech functionality
+        self.is_reading = False
+        self.current_audio_file = None
+        self.reading_paused = False
+        self.reading_thread = None
 
+        # Inside your __init__(self, root) method:
         self.style = ttk.Style()
         self.style.theme_use('default') # Ensure a base theme is used
 
@@ -237,7 +248,361 @@ class VocabularyApp:
         )
         return resp.choices[0].message.content.strip()
     
-    # Labels in gold
+    # ------------- LISTENING ----------
+    def create_listen_functionality(self):
+        """Create the popup window for listening options"""
+        listen_window = tk.Toplevel(self.root)
+        listen_window.title("Listen to Text")
+        listen_window.configure(bg="#222")
+        listen_window.geometry("300x150")
+        listen_window.transient(self.root)
+        listen_window.grab_set()
+        
+        # Center the window
+        listen_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (listen_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (listen_window.winfo_height() // 2)
+        listen_window.geometry(f"+{x}+{y}")
+        
+        # Create buttons
+        frame = tk.Frame(listen_window, bg="#222")
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        ttk.Button(frame, text="Load _TXT.txt file", 
+                  style='SmallBlue.TButton',
+                  command=lambda: self.start_reading_from_file(listen_window)).pack(pady=10, fill=tk.X)
+        
+        ttk.Button(frame, text="Read from Study Text Box", 
+                  style='SmallGreen.TButton',
+                  command=lambda: self.start_reading_from_textbox(listen_window)).pack(pady=10, fill=tk.X)
+        
+        ttk.Button(frame, text="Cancel", 
+                  style='SmallRed.TButton',
+                  command=listen_window.destroy).pack(pady=10, fill=tk.X)
+    
+    def start_reading_from_file(self, parent_window):
+        """Start reading from a selected text file"""
+        filename = filedialog.askopenfilename(
+            title="Select Text File",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    text_content = file.read()
+                parent_window.destroy()
+                self.show_reading_controls(text_content, f"File: {os.path.basename(filename)}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not read file: {e}")
+    
+    def start_reading_from_textbox(self, parent_window):
+        """Start reading from the Study Text Box"""
+        text_content = self.study_textbox.get(1.0, tk.END).strip()
+        
+        if not text_content:
+            messagebox.showwarning("No Text", "Study Text Box is empty.")
+            return
+        
+        parent_window.destroy()
+        self.show_reading_controls(text_content, "Study Text Box")
+    
+    def show_reading_controls(self, text_content, source_name):
+        """Show the reading controls window"""
+        # Stop any current reading
+        self.stop_reading()
+        
+        # Create controls window
+        controls_window = tk.Toplevel(self.root)
+        controls_window.title(f"Reading: {source_name}")
+        controls_window.configure(bg="#222")
+        controls_window.geometry("400x200")
+        controls_window.transient(self.root)
+        
+        # Make window stay on top
+        controls_window.attributes('-topmost', True)
+        
+        # Center the window
+        controls_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (controls_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (controls_window.winfo_height() // 2)
+        controls_window.geometry(f"+{x}+{y}")
+        
+        # Content frame
+        content_frame = tk.Frame(controls_window, bg="#222")
+        content_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        # Source label
+        source_label = tk.Label(content_frame, text=f"Source: {source_name}", 
+                            bg="#222", fg="white", font=("Helvetica", 10, "bold"))
+        source_label.pack(pady=(0, 10))
+        
+        # Status label
+        status_label = tk.Label(content_frame, text="Ready to read", 
+                            bg="#222", fg="lightgreen", font=("Helvetica", 9))
+        status_label.pack(pady=(0, 10))
+        
+        # Progress bar
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(content_frame, variable=progress_var, maximum=100)
+        progress_bar.pack(fill=tk.X, pady=(0, 15))
+        
+        # Control buttons frame
+        button_frame = tk.Frame(content_frame, bg="#222")
+        button_frame.pack(fill=tk.X)
+        
+        # Control buttons
+        play_button = ttk.Button(button_frame, text="Start Reading", 
+                                style='SmallGreen.TButton',
+                                command=lambda: self.toggle_reading(text_content, play_button, pause_button, status_label, progress_var))
+        play_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        pause_button = ttk.Button(button_frame, text="Pause", 
+                                style='SmallGoldBrown.TButton',
+                                command=lambda: self.toggle_pause(pause_button, status_label),
+                                state=tk.DISABLED)
+        pause_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        stop_button = ttk.Button(button_frame, text="Stop", 
+                                style='SmallRed.TButton',
+                                command=lambda: self.stop_reading_ui(controls_window, play_button, pause_button, status_label, progress_var))
+        stop_button.pack(side=tk.LEFT)
+        
+        # Store references for cleanup
+        controls_window.protocol("WM_DELETE_WINDOW", 
+                            lambda: self.stop_reading_ui(controls_window, play_button, pause_button, status_label, progress_var))
+        
+        self.current_controls_window = controls_window
+    
+    def toggle_reading(self, text_content, play_button, pause_button, status_label, progress_var):
+        """Start or resume reading"""
+        if not self.is_reading:
+            # Start reading
+            self.is_reading = True
+            self.reading_paused = False
+            play_button.config(state=tk.DISABLED)
+            pause_button.config(state=tk.NORMAL)
+            status_label.config(text="Reading...", fg="lightgreen")
+            
+            # Reset progress bar
+            progress_var.set(0)
+            
+            # Start reading in a separate thread - PASS THE BUTTON REFERENCES
+            self.reading_thread = threading.Thread(
+                target=self.read_text, 
+                args=(text_content, status_label, progress_var, play_button, pause_button),
+                daemon=True
+            )
+            self.reading_thread.start()
+        elif self.reading_paused:
+            # Resume reading
+            self.reading_paused = False
+            pygame.mixer.music.unpause()
+            pause_button.config(text="Pause")
+            status_label.config(text="Reading...", fg="lightgreen")
+    
+    def toggle_pause(self, pause_button, status_label):
+        """Pause or resume reading"""
+        if self.is_reading and not self.reading_paused:
+            # Pause reading
+            self.reading_paused = True
+            pygame.mixer.music.pause()
+            pause_button.config(text="Resume")
+            status_label.config(text="Paused", fg="yellow")
+        elif self.is_reading and self.reading_paused:
+            # Resume reading
+            self.reading_paused = False
+            pygame.mixer.music.unpause()
+            pause_button.config(text="Pause")
+            status_label.config(text="Reading...", fg="lightgreen")
+    
+    def read_text(self, text_content, status_label, progress_var, play_button, pause_button):
+        """Read text using text-to-speech with reliable pause/resume"""
+        try:
+            # Clean up any previous audio files at the start only
+            if self.current_audio_file and os.path.exists(self.current_audio_file):
+                try:
+                    # Make sure audio is stopped before deleting
+                    if pygame.mixer.music.get_busy():
+                        pygame.mixer.music.stop()
+                    pygame.time.wait(100)  # Small delay to ensure release
+                    os.unlink(self.current_audio_file)
+                except Exception as e:
+                    print(f"Warning: Could not delete previous audio file: {e}")
+            
+            # Generate speech using gTTS
+            status_label.after(0, lambda: status_label.config(text="Generating speech...", fg="yellow"))
+            
+            # Split into reasonable chunks but not too small
+            chunks = self.split_text_for_tts(text_content, max_length=1000)
+            total_chunks = len(chunks)
+            
+            audio_files = []  # Track all created audio files for cleanup
+            
+            for i, chunk in enumerate(chunks):
+                if not self.is_reading:
+                    break
+                    
+                # Create a new temporary file for each chunk
+                with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
+                    chunk_audio_file = temp_audio.name
+                    audio_files.append(chunk_audio_file)
+                
+                # Generate audio for this chunk
+                tts = gTTS(text=chunk, lang='de', slow=False)
+                tts.save(chunk_audio_file)
+                
+                # Stop any current playback before loading new file
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.stop()
+                    pygame.time.wait(50)  # Small delay
+                
+                # Load and play the audio
+                pygame.mixer.music.load(chunk_audio_file)
+                pygame.mixer.music.play()
+                
+                status_label.after(0, lambda: status_label.config(text="Reading...", fg="lightgreen"))
+                
+                # Wait for this chunk to finish playing, respecting pause/resume
+                while (pygame.mixer.music.get_busy() or self.reading_paused) and self.is_reading:
+                    if not self.reading_paused:
+                        # Update progress
+                        chunk_progress = 0
+                        try:
+                            # Get playback position (returns milliseconds, -1 if not playing)
+                            pos = pygame.mixer.music.get_pos()
+                            if pos > 0:
+                                # Estimate chunk duration based on text length (rough estimate)
+                                chunk_duration = len(chunk) * 0.1  # 100ms per character estimate
+                                chunk_progress = min(pos / 1000.0 / chunk_duration, 1.0) if chunk_duration > 0 else 0
+                        except:
+                            chunk_progress = 0
+                        
+                        progress = ((i + chunk_progress) / total_chunks) * 100
+                        progress_var.set(min(progress, 100))
+                    pygame.time.wait(100)
+                
+                # Don't delete the chunk file immediately - wait until we're done with all files
+            
+            # Complete progress
+            if self.is_reading:
+                progress_var.set(100)
+                status_label.after(0, lambda: status_label.config(text="Reading complete", fg="lightblue"))
+            
+            # Clean up all audio files after reading is complete
+            self.cleanup_audio_files(audio_files)
+            
+            # RESET UI STATE WHEN READING FINISHES
+            self.is_reading = False
+            self.reading_paused = False
+            
+            # Re-enable the play button and disable pause button
+            play_button.after(0, lambda: play_button.config(state=tk.NORMAL))
+            pause_button.after(0, lambda: pause_button.config(state=tk.DISABLED, text="Pause"))
+            
+        except Exception as e:
+            status_label.after(0, lambda: status_label.config(text=f"Error: {str(e)}", fg="red"))
+            # Clean up any created files even on error
+            if 'audio_files' in locals():
+                self.cleanup_audio_files(audio_files)
+            
+            # RESET UI STATE ON ERROR TOO
+            self.is_reading = False
+            self.reading_paused = False
+            play_button.after(0, lambda: play_button.config(state=tk.NORMAL))
+            pause_button.after(0, lambda: pause_button.config(state=tk.DISABLED, text="Pause"))
+
+    def split_text_for_tts(self, text, max_length=1000):
+        """Split text into chunks for TTS, trying to keep sentences intact"""
+        import re
+        
+        # Split by sentences first
+        sentences = re.split(r'([.!?]+[\s$])', text)
+        
+        # Reconstruct sentences with their punctuation
+        reconstructed = []
+        i = 0
+        while i < len(sentences):
+            if i + 1 < len(sentences):
+                sentence = sentences[i] + sentences[i+1]
+                i += 2
+            else:
+                sentence = sentences[i]
+                i += 1
+            reconstructed.append(sentence.strip())
+        
+        # Group sentences into chunks
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in reconstructed:
+            if len(current_chunk) + len(sentence) <= max_length:
+                current_chunk += " " + sentence if current_chunk else sentence
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = sentence
+        
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks if chunks else [text]
+    
+    def cleanup_audio_files(self, audio_files):
+        """Clean up audio files with proper error handling"""
+        for audio_file in audio_files:
+            if audio_file and os.path.exists(audio_file):
+                try:
+                    # Ensure pygame has released the file
+                    if pygame.mixer.music.get_busy():
+                        pygame.mixer.music.stop()
+                    pygame.time.wait(100)  # Give system time to release file
+                    os.unlink(audio_file)
+                except Exception as e:
+                    print(f"Could not delete audio file {audio_file}: {e}")
+                    # Don't show error to user for cleanup failures
+
+    def stop_reading(self):
+        """Stop reading completely"""
+        self.is_reading = False
+        self.reading_paused = False
+        
+        # Stop audio playback with proper cleanup
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+            pygame.time.wait(100)  # Give time for playback to stop
+        
+        # Note: We don't delete the current_audio_file here anymore since we're using chunk files
+        # The cleanup will happen in the read_text method
+    
+    def stop_reading_ui(self, controls_window, play_button, pause_button, status_label, progress_var):
+        """Stop reading and clean up UI"""
+        self.stop_reading()
+        progress_var.set(0)
+        status_label.config(text="Stopped", fg="red")
+        play_button.config(state=tk.NORMAL)
+        pause_button.config(state=tk.DISABLED, text="Pause")
+    
+        # Close the controls window
+        if controls_window:
+            controls_window.destroy()
+    
+    def stop_reading(self):
+        """Stop reading completely"""
+        self.is_reading = False
+        self.reading_paused = False
+        
+        # Stop audio playback
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+        
+        # Clean up audio file
+        if self.current_audio_file and os.path.exists(self.current_audio_file):
+            try:
+                os.unlink(self.current_audio_file)
+                self.current_audio_file = None
+            except:
+                pass
    
 
     def prompt_inputbox(self):
@@ -716,7 +1081,7 @@ class VocabularyApp:
         ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
         ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='SmallLightPurple.TButton', command=self.capture_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="  LISTEN to\nthe Study Text", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=2) # <---- new
+        ttk.Button(study_btn_frame, text="  LISTEN to\nthe Study Text", style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=2) # <---- new
 
 
     # --- Group 3: Translation Buttons ---
@@ -905,7 +1270,7 @@ class VocabularyApp:
                     button_frame,
                     text="LISTENING Comprehension",
                     style='SmallPurple.TButton',
-                    command=self.generate_comprehension_questions
+                    command=self.generate_listening_comprehension_questions
                 ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
         
         return textbox
@@ -956,6 +1321,10 @@ class VocabularyApp:
             
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
+    
+    def generate_listening_comprehension_questions(self):
+        pass
+        
 
     def add_highlight_functionality(self):
         """Add highlight functionality to the three main textboxes"""
