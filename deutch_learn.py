@@ -11,7 +11,6 @@ import threading
 from gtts import gTTS
 import pygame
 import tempfile
-import time
 
 # Add these imports at the top of your file
 pygame.mixer.init()
