@@ -85,6 +85,19 @@ class VocabularyApp:
         self.divert = 0
         self.load_current_voc = 0
 
+        # --------- LISTENING COMPREHENSION ---------
+        # Add these variables for listening comprehension
+        # Add these variables for listening comprehension
+        self.listening_comprehension_text = ""
+        self.current_questions = []
+        self.current_question_index = 0
+        self.listening_score = 0
+        self.total_listening_questions = 0
+    
+        # ADD THIS - Create the list_compr_files directory if it doesn't exist
+        self.listening_dir = "list_compr_files"
+        os.makedirs(self.listening_dir, exist_ok=True)
+
         # Create a smaller font for the highlight buttons
         self.small_button_font = tkFont.Font(family="Helvetica", size=8, weight="normal")
         
@@ -548,18 +561,114 @@ class VocabularyApp:
         return chunks if chunks else [text]
     
     def cleanup_audio_files(self, audio_files):
-        """Clean up audio files with proper error handling"""
+        """Clean up audio files with proper error handling and retries"""
         for audio_file in audio_files:
             if audio_file and os.path.exists(audio_file):
+                self.safe_delete_file(audio_file)
+
+    def read_text_for_comprehension(self, text, reading_window, status_label, progress_var):
+        """Read the text and then generate questions - FIXED SEQUENCING"""
+        try:
+            status_label.after(0, lambda: status_label.config(text="Reading German text...", fg="lightgreen"))
+            
+            # Use smaller chunks for better reliability
+            chunks = self.split_text_for_tts(text, max_length=500)
+            total_chunks = len(chunks)
+            
+            # Read each chunk sequentially
+            for i, chunk in enumerate(chunks):
+                # Update progress
+                progress = ((i + 1) / total_chunks) * 100
+                progress_var.set(progress)
+                
+                # Read this chunk using the read_single_chunk method
+                success = self.read_single_chunk(chunk, f"Chunk {i+1}/{total_chunks}")
+                
+                if not success:
+                    print(f"Failed to read chunk {i+1}")
+                    continue
+                
+                # Small delay between chunks
+                pygame.time.wait(200)
+            
+            # Update status to show completion
+            status_label.after(0, lambda: status_label.config(text="Reading complete! Starting questions...", fg="lightgreen"))
+            
+            # Close window and continue to questions AFTER a brief delay
+            reading_window.after(1000, lambda: self.finish_reading_and_start_questions(reading_window))
+            
+        except Exception as e:
+            print(f"Error reading text: {e}")
+            status_label.after(0, lambda: status_label.config(text=f"Error: {str(e)}", fg="red"))
+            # Still try to continue to questions
+            reading_window.after(2000, lambda: self.finish_reading_and_start_questions(reading_window))
+
+    def read_single_chunk(self, text, chunk_info=""):
+        """Read a single chunk of text reliably"""
+        temp_file = None
+        try:
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
+                temp_file = temp_audio.name
+            
+            # Generate speech
+            tts = gTTS(text=text, lang='de', slow=False)
+            tts.save(temp_file)
+            
+            # Ensure pygame mixer is ready
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            
+            # Stop any current playback
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.stop()
+                pygame.time.wait(200)
+            
+            # Load and play
+            pygame.mixer.music.load(temp_file)
+            pygame.mixer.music.play()
+            
+            # Wait for playback to complete
+            start_time = pygame.time.get_ticks()
+            while pygame.mixer.music.get_busy():
+                pygame.time.wait(100)
+                # Safety timeout
+                if pygame.time.get_ticks() - start_time > 30000:  # 30 second timeout per chunk
+                    pygame.mixer.music.stop()
+                    break
+            
+            # Success
+            return True
+            
+        except Exception as e:
+            print(f"Error reading chunk {chunk_info}: {e}")
+            return False
+            
+        finally:
+            # Always try to clean up the temp file
+            if temp_file and os.path.exists(temp_file):
+                self.safe_delete_file_delayed(temp_file)
+
+
+    def safe_delete_file_delayed(self, filepath, delay=1000):
+        """Delete a file after a delay to ensure it's not in use"""
+        def delete_file():
+            if filepath and os.path.exists(filepath):
                 try:
-                    # Ensure pygame has released the file
-                    if pygame.mixer.music.get_busy():
-                        pygame.mixer.music.stop()
-                    pygame.time.wait(100)  # Give system time to release file
-                    os.unlink(audio_file)
-                except Exception as e:
-                    print(f"Could not delete audio file {audio_file}: {e}")
-                    # Don't show error to user for cleanup failures
+                    os.unlink(filepath)
+                except:
+                    pass  # Ignore cleanup errors
+        
+        self.root.after(delay, delete_file)
+
+    def finish_reading_and_start_questions(self, reading_window):
+        """Close reading window and start question session"""
+        if reading_window:
+            reading_window.destroy()
+        
+        # Start the question session
+        self.generate_questions_after_reading()
+
 
     def stop_reading(self):
         """Stop reading completely"""
@@ -603,6 +712,15 @@ class VocabularyApp:
             except:
                 pass
    
+    def cleanup_audio_files_delayed(self, audio_files, delay=500):
+        """Clean up audio files after a delay to ensure pygame has released them"""
+        def delayed_cleanup():
+            for audio_file in audio_files:
+                if audio_file and os.path.exists(audio_file):
+                    self.safe_delete_file(audio_file)
+        
+        # Schedule cleanup after a delay
+        self.root.after(delay, delayed_cleanup)
 
     def prompt_inputbox(self):
         """
@@ -1269,7 +1387,7 @@ class VocabularyApp:
                     button_frame,
                     text="LISTENING Comprehension",
                     style='SmallPurple.TButton',
-                    command=self.generate_listening_comprehension_questions
+                    command=self.create_listening_comprehension_questions
                 ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
         
         return textbox
@@ -1973,6 +2091,716 @@ class VocabularyApp:
         
         self.display_random_word()
 
+# ---------------- LARGE BLOCK FOR LISTENING COMPREHENSION ---------------
+        
+    def create_listening_comprehension_questions(self):
+        """Create the listening comprehension popup window"""
+        listen_comp_window = tk.Toplevel(self.root)
+        listen_comp_window.title("Listening Comprehension")
+        listen_comp_window.configure(bg="#222")
+        listen_comp_window.geometry("400x200")
+        listen_comp_window.transient(self.root)
+        listen_comp_window.grab_set()
+        
+        # Center the window
+        listen_comp_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (listen_comp_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (listen_comp_window.winfo_height() // 2)
+        listen_comp_window.geometry(f"+{x}+{y}")
+        
+        # Create buttons
+        frame = tk.Frame(listen_comp_window, bg="#222")
+        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        ttk.Button(frame, text="Load German Text File", 
+                  style='SmallBlue.TButton',
+                  command=lambda: self.start_listening_from_file(listen_comp_window)).pack(pady=10, fill=tk.X)
+        
+        ttk.Button(frame, text="Search Internet for German Text", 
+                  style='SmallGreen.TButton',
+                  command=lambda: self.search_german_text(listen_comp_window)).pack(pady=10, fill=tk.X)
+        
+        ttk.Button(frame, text="Cancel", 
+                  style='SmallRed.TButton',
+                  command=listen_comp_window.destroy).pack(pady=10, fill=tk.X)
+    
+    def start_listening_from_file(self, parent_window):
+        """Start listening comprehension from a selected text file"""
+        filename = filedialog.askopenfilename(
+            title="Select German Text File",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    self.listening_comprehension_text = file.read()
+                parent_window.destroy()
+                self.generate_listening_questions()
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not read file: {e}")
+    
+    def search_german_text(self, parent_window):
+        """Search for a German text online"""
+        try:
+            # Common German news and content websites
+            sources = [
+                "https://www.dw.com/de/themen/s-9077",
+                "https://www.tagesschau.de/",
+                "https://www.spiegel.de/thema/aktuelles/",
+                "https://www.zeit.de/aktuelles",
+                "https://www.giz.de/de/regionen?r=africa",
+                "https://www.giz.de/de/regionen?r=asia",
+                "https://www.giz.de/de/regionen?r=europe",
+                "https://www.giz.de/de/regionen?r=southamerica"
+            ]
+            
+            source = random.choice(sources)
+            response = requests.get(source, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extract text from paragraphs
+            paragraphs = soup.find_all('p')
+            german_text = ""
+            
+            for p in paragraphs:
+                text = p.get_text().strip()
+                if len(text) > 50:  # Only take substantial paragraphs
+                    german_text += text + " "
+                    if len(german_text.split()) > 150:  # Target length
+                        break
+            
+            if not german_text or len(german_text.split()) < 50:
+                # Fallback: Use AI to generate text if web scraping fails
+                german_text = self.generate_german_text_with_ai()
+            
+            self.listening_comprehension_text = german_text[:2000]  # Limit length
+            parent_window.destroy()
+            self.generate_listening_questions()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not fetch German text: {e}")
+    
+    def generate_german_text_with_ai(self):
+        """Generate German text using OpenAI as fallback"""
+        try:
+            themes = [
+                "Umwelt und Naturschutz in Deutschland",
+                "Alltagsleben in einer deutschen Stadt", 
+                "Deutsche Geschichte und Kultur",
+                "Sport und Freizeitaktivitäten",
+                "Wissenschaft und Technologie",
+                "Philosophie und Psychologie im modernen Leben",
+                "Kurze Geschichte oder Märchen",
+                "Politische Themen in Europa"
+            ]
+            
+            theme = random.choice(themes)
+            
+            prompt = f"""
+            Schreibe einen deutschen Text von 70-150 Wörtern zum Thema: {theme}.
+            Der Text sollte für Deutschlernende geeignet sein, aber nicht zu einfach.
+            Verwende korrekte Grammatik und einen klaren Aufbau.
+            Der Text sollte selbstständig verständlich sein.
+            """
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.8,
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            # Final fallback: pre-written text
+            return self.get_fallback_german_text()
+    
+    
+    def get_fallback_german_text(self):
+        """Provide a fallback German text"""
+        fallback_texts = [
+            "In Deutschland spielt Umweltschutz eine große Rolle. Viele Menschen trennen ihren Müll sorgfältig und nutzen öffentliche Verkehrsmittel. Die erneuerbaren Energien wie Wind- und Solarkraft werden immer wichtiger. In den Städten sieht man viele Fahrradfahrer, die umweltfreundlich unterwegs sind. Der Schutz der Natur ist den Deutschen sehr wichtig, deshalb gibt es viele Naturschutzgebiete. Jeder kann durch kleine Veränderungen im Alltag zum Umweltschutz beitragen.",
+            "Das deutsche Schulsystem beginnt mit der Grundschule. Danach gehen Schüler auf verschiedene weiterführende Schulen wie Gymnasium, Realschule oder Hauptschule. Die Ausbildung ist in Deutschland sehr praxisorientiert. Viele junge Menschen machen eine Lehre in einem Betrieb. Die Universitäten bieten akademische Bildung und forschen in vielen Bereichen. Bildung hat in Deutschland einen hohen Stellenwert und ist meist kostenlos.",
+            "Berlin ist die Hauptstadt von Deutschland und eine sehr vielfältige Stadt. Hier leben Menschen aus vielen verschiedenen Kulturen zusammen. Die Stadt hat eine reiche Geschichte, die man an vielen Orten sehen kann. Das Brandenburger Tor und die Berliner Mauer sind bekannte Sehenswürdigkeiten. Berlin ist auch für seine Kunstszene und sein Nachtleben berühmt. Jedes Jahr besuchen Millionen Touristen diese lebendige Stadt."
+        ]
+        return random.choice(fallback_texts)
+    
+    def generate_listening_questions(self):
+        """Generate comprehension questions based on the German text"""
+        try:
+            # Save the text to a file for later review
+            saved_file = self.save_listening_text()
+            
+            # FIRST: Read the entire text to the user
+            self.speak_text_with_controls(self.listening_comprehension_text, saved_file)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not generate questions: {e}")
+    
+    def speak_text_with_controls(self, text, source_info):
+        """Read the entire text first, then generate questions"""
+        # Create reading window
+        reading_window = tk.Toplevel(self.root)
+        reading_window.title("Listening to German Text")
+        reading_window.configure(bg="#222")
+        reading_window.geometry("500x250")
+        reading_window.transient(self.root)
+        
+        # Center the window
+        reading_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (reading_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (reading_window.winfo_height() // 2)
+        reading_window.geometry(f"+{x}+{y}")
+        
+        # Content frame
+        content_frame = tk.Frame(reading_window, bg="#222")
+        content_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        # Info label
+        info_label = tk.Label(content_frame, text=f"Source: {source_info}", 
+                            bg="#222", fg="white", font=("Helvetica", 10, "bold"))
+        info_label.pack(pady=(0, 10))
+        
+        # Instruction label
+        instruction_label = tk.Label(content_frame, 
+                                text="Listen carefully to the German text. Questions will follow.",
+                                bg="#222", fg="lightgreen", font=("Helvetica", 9))
+        instruction_label.pack(pady=(0, 10))
+        
+        # Status label
+        status_label = tk.Label(content_frame, text="Preparing to read text...", 
+                            bg="#222", fg="yellow", font=("Helvetica", 9))
+        status_label.pack(pady=(0, 15))
+        
+        # Progress bar
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(content_frame, variable=progress_var, maximum=100)
+        progress_bar.pack(fill=tk.X, pady=(0, 15))
+        
+        # Control buttons frame
+        button_frame = tk.Frame(content_frame, bg="#222")
+        button_frame.pack(fill=tk.X)
+        
+        # Start reading button
+        start_button = ttk.Button(button_frame, text="Start Reading Text", 
+                                style='SmallGreen.TButton',
+                                command=lambda: self.start_reading_for_comprehension(
+                                    text, reading_window, status_label, progress_var))
+        start_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Skip button (in case user doesn't want to listen)
+        skip_button = ttk.Button(button_frame, text="Skip to Questions", 
+                                style='SmallGoldBrown.TButton',
+                                command=lambda: self.skip_to_questions(reading_window))
+        skip_button.pack(side=tk.LEFT)
+    
+    def start_reading_for_comprehension(self, text, reading_window, status_label, progress_var):
+        """Start reading the text for comprehension"""
+        threading.Thread(
+            target=self.read_text_for_comprehension,
+            args=(text, reading_window, status_label, progress_var),
+            daemon=True
+        ).start()
+    
+    # def read_text_for_comprehension(self, text, reading_window, status_label, progress_var):
+    #     """Read the text and then generate questions"""
+    #     try:
+    #         status_label.after(0, lambda: status_label.config(text="Reading German text...", fg="lightgreen"))
+            
+    #         # Use the same TTS functionality to read the entire text
+    #         chunks = self.split_text_for_tts(text, max_length=1000)
+    #         total_chunks = len(chunks)
+            
+    #         audio_files = []
+            
+    #         for i, chunk in enumerate(chunks):
+    #             # Create temporary file for this chunk
+    #             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
+    #                 chunk_audio_file = temp_audio.name
+    #                 audio_files.append(chunk_audio_file)
+                
+    #             # Generate and play audio
+    #             tts = gTTS(text=chunk, lang='de', slow=False)
+    #             tts.save(chunk_audio_file)
+                
+    #             if pygame.mixer.music.get_busy():
+    #                 pygame.mixer.music.stop()
+    #                 pygame.time.wait(50)
+                
+    #             pygame.mixer.music.load(chunk_audio_file)
+    #             pygame.mixer.music.play()
+                
+    #             # Update progress
+    #             progress = ((i + 1) / total_chunks) * 100
+    #             progress_var.set(progress)
+                
+    #             # Wait for playback to finish
+    #             while pygame.mixer.music.get_busy():
+    #                 pygame.time.wait(100)
+            
+    #         # Clean up audio files
+    #         self.cleanup_audio_files(audio_files)
+            
+    #         # Close reading window and generate questions
+    #         reading_window.after(0, reading_window.destroy)
+    #         self.generate_questions_after_reading()
+            
+    #     except Exception as e:
+    #         status_label.after(0, lambda: status_label.config(text=f"Error: {str(e)}", fg="red"))
+    
+    def skip_to_questions(self, reading_window):
+        """Skip the reading and go directly to questions"""
+        reading_window.destroy()
+        self.generate_questions_after_reading()
+
+    def generate_questions_after_reading(self):
+        """Generate questions after the text has been read"""
+        try:
+            # Show generating message
+            messagebox.showinfo("Generating Questions", "The text has been read. Now generating comprehension questions...")
+            
+            prompt = f"""
+            Basierend auf dem folgenden deutschen Text, erstelle 3-5 Verständnisfragen auf Deutsch.
+            Die Fragen sollten das Hörverständnis testen und für Deutschlernende geeignet sein.
+            
+            WICHTIG: Gib die Fragen in einem sehr spezifischen Format zurück:
+            
+            FRAGE 1: [Hier kommt die erste Frage]
+            FRAGE 2: [Hier kommt die zweite Frage]
+            FRAGE 3: [Hier kommt die dritte Frage]
+            
+            Text:
+            {self.listening_comprehension_text}
+            
+            Stelle sicher, dass jede Frage mit "FRAGE X:" beginnt und keine zusätzlichen Erklärungen enthält.
+            """
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+            )
+            
+            questions_text = response.choices[0].message.content.strip()
+            print(f"Generated questions: {questions_text}")  # Debug print
+            
+            self.parse_questions(questions_text)
+            
+            # Start the listening session
+            self.start_listening_session()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not generate questions: {e}")
+            print(f"Question generation error: {e}")
+
+    def start_listening_session(self):
+        """Start the listening comprehension session"""
+        print(f"Starting listening session with {len(self.current_questions)} questions")  # Debug
+        
+        if not self.current_questions:
+            messagebox.showwarning("No Questions", "No questions were generated.")
+            print("No questions available")  # Debug
+            return
+        
+        # Create listening session window
+        session_window = tk.Toplevel(self.root)
+        session_window.title("Listening Comprehension Session")
+        session_window.configure(bg="#222")
+        session_window.geometry("500x300")
+        session_window.transient(self.root)
+        
+        # Center the window
+        session_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (session_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (session_window.winfo_height() // 2)
+        session_window.geometry(f"+{x}+{y}")
+        
+        # Make sure window stays on top
+        session_window.attributes('-topmost', True)
+        
+        print("Session window created")  # Debug
+        
+        # Content frame
+        content_frame = tk.Frame(session_window, bg="#222")
+        content_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        # Question display
+        question_label = tk.Label(content_frame, text="Current Question:", 
+                                bg="#222", fg="white", font=("Helvetica", 10, "bold"))
+        question_label.pack(anchor=tk.W, pady=(0, 5))
+        
+        question_text = tk.Text(content_frame, height=4, width=50, wrap=tk.WORD,
+                            bg="#333", fg="white", font=("Helvetica", 9))
+        question_text.pack(fill=tk.X, pady=(0, 15))
+        question_text.config(state=tk.NORMAL)
+        
+        # Progress label
+        progress_label = tk.Label(content_frame, text="", 
+                                bg="#222", fg="lightblue", font=("Helvetica", 9))
+        progress_label.pack(pady=(0, 10))
+        
+        # Score label
+        score_label = tk.Label(content_frame, text="Score: 0/0", 
+                            bg="#222", fg="lightgreen", font=("Helvetica", 9, "bold"))
+        score_label.pack(pady=(0, 15))
+        
+        # Control buttons frame
+        button_frame = tk.Frame(content_frame, bg="#222")
+        button_frame.pack(fill=tk.X)
+        
+        # Control buttons
+        repeat_button = ttk.Button(button_frame, text="Repeat Question", 
+                                style='SmallBlue.TButton',
+                                command=lambda: self.speak_current_question())
+        repeat_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        next_button = ttk.Button(button_frame, text="Next Question", 
+                                style='SmallGreen.TButton',
+                                command=lambda: self.next_listening_question(question_text, progress_label, score_label, session_window))
+        next_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        exit_button = ttk.Button(button_frame, text="Exit", 
+                                style='SmallRed.TButton',
+                                command=session_window.destroy)
+        exit_button.pack(side=tk.LEFT)
+        
+        # Store references
+        self.current_session_window = session_window
+        self.current_question_text = question_text
+        self.current_progress_label = progress_label
+        self.current_score_label = score_label
+        
+        print("About to display first question")  # Debug
+        
+        # Display first question
+        self.display_current_question()
+        
+        print("First question displayed")  # Debug
+
+    def display_current_question(self):
+        """Display the current question and speak it"""
+        if self.current_question_index < len(self.current_questions):
+            question = self.current_questions[self.current_question_index]
+            self.current_question_text.delete(1.0, tk.END)
+            self.current_question_text.insert(tk.END, question)
+            
+            # Update progress
+            progress_text = f"Question {self.current_question_index + 1} of {len(self.current_questions)}"
+            self.current_progress_label.config(text=progress_text)
+            
+            # Update score
+            score_text = f"Score: {self.listening_score}/{self.current_question_index}"
+            self.current_score_label.config(text=score_text)
+            
+            # Speak the question
+            self.speak_current_question()
+        else:
+            self.finish_listening_session()
+
+    def speak_current_question(self):
+        """Speak the current question using TTS"""
+        if self.current_question_index < len(self.current_questions):
+            question = self.current_questions[self.current_question_index]
+            
+            # Use the same TTS functionality from the reading feature
+            threading.Thread(
+                target=self.speak_text, 
+                args=(question,),
+                daemon=True
+            ).start()
+
+    def speak_text(self, text):
+        """Speak text using TTS (reusing reading functionality)"""
+        try:
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
+                temp_file = temp_audio.name
+            
+            tts = gTTS(text=text, lang='de', slow=False)
+            tts.save(temp_file)
+            
+            pygame.mixer.music.load(temp_file)
+            pygame.mixer.music.play()
+            
+            # Wait for playback to finish
+            while pygame.mixer.music.get_busy():
+                pygame.time.wait(100)
+            
+            # Clean up - with better file handling
+            self.safe_delete_file(temp_file)
+                
+        except Exception as e:
+            print(f"TTS error: {e}")
+
+    def safe_delete_file(self, filepath):
+        """Safely delete a file with retries and error handling"""
+        if not filepath or not os.path.exists(filepath):
+            return
+            
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                # Try to close any pygame resources first
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.stop()
+                
+                # Small delay before attempting deletion
+                pygame.time.wait(100 * (attempt + 1))  # Increasing delay
+                
+                os.unlink(filepath)
+                return  # Success!
+                
+            except PermissionError:
+                if attempt < max_retries - 1:
+                    # Try to force pygame to release the file
+                    try:
+                        pygame.mixer.music.stop()
+                        pygame.mixer.quit()
+                        pygame.mixer.init()  # Reinitialize mixer
+                    except:
+                        pass
+                    continue
+                else:
+                    print(f"Could not delete audio file {filepath} after {max_retries} attempts")
+                    # Don't show error to user for cleanup failures
+            except Exception as e:
+                print(f"Error deleting file {filepath}: {e}")
+                break
+    
+    def parse_questions(self, questions_text):
+        """Parse the questions from the AI response"""
+        try:
+            questions = []
+            lines = questions_text.split('\n')
+            
+            for line in lines:
+                line = line.strip()
+                # More flexible parsing to handle different formats
+                if line.startswith('FRAGE') and (':' in line or '.' in line):
+                    # Handle both "FRAGE 1:" and "FRAGE 1." formats
+                    if ':' in line:
+                        question = line.split(':', 1)[1].strip()
+                    else:
+                        question = line.split('.', 1)[1].strip()
+                    
+                    if question:  # Only add non-empty questions
+                        questions.append(question)
+            
+            # If no questions were found with the expected format, try alternative parsing
+            if not questions:
+                # Split by numbers or bullet points
+                import re
+                question_pattern = r'^(?:\d+\.\s*|FRAGE\s*\d+\s*[:.]\s*)(.+)$'
+                for line in lines:
+                    match = re.match(question_pattern, line.strip(), re.IGNORECASE)
+                    if match:
+                        questions.append(match.group(1).strip())
+            
+            # If still no questions, use the entire text as one question
+            if not questions:
+                questions = ["Was ist die Hauptidee des Textes?"]
+            
+            self.current_questions = questions
+            self.total_listening_questions = len(questions)
+            self.current_question_index = 0
+            self.listening_score = 0
+            
+            print(f"Parsed {len(questions)} questions: {questions}")  # Debug print
+            
+        except Exception as e:
+            print(f"Error parsing questions: {e}")
+            # Fallback questions
+            self.current_questions = [
+                "Was ist die Hauptidee des Textes?",
+                "Welche wichtigen Informationen wurden erwähnt?",
+                "Was können Sie über das Thema sagen?"
+            ]
+            self.total_listening_questions = len(self.current_questions)
+            self.current_question_index = 0
+            self.listening_score = 0
+    
+    def save_listening_text(self):
+        """Save the listening text to the list_compr_files folder"""
+        try:
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Make sure directory exists
+            if not hasattr(self, 'listening_dir'):
+                self.listening_dir = "list_compr_files"
+            os.makedirs(self.listening_dir, exist_ok=True)
+            
+            filename = os.path.join(self.listening_dir, f"listening_text_{timestamp}.txt")
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(self.listening_comprehension_text)
+            
+            messagebox.showinfo("Text Saved", f"German text saved to {filename} for later review.")
+            return f"list_compr_files/listening_text_{timestamp}.txt"
+            
+        except Exception as e:
+            print(f"Could not save listening text: {e}")
+            return "Unknown source"
+    
+    def search_german_text(self, parent_window):
+        """Search for a German text online"""
+        try:
+            # Common German news and content websites
+            sources = [
+                "https://www.dw.com/de/themen/s-9077",
+                "https://www.tagesschau.de/",
+                "https://www.spiegel.de/thema/aktuelles/",
+                "https://www.zeit.de/aktuelles",
+                "https://www.giz.de/de/regionen?r=africa",
+                "https://www.giz.de/de/regionen?r=asia",
+                "https://www.giz.de/de/regionen?r=europe",
+                "https://www.giz.de/de/regionen?r=southamerica"
+            ]
+            
+            source = random.choice(sources)
+            response = requests.get(source, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extract text from paragraphs
+            paragraphs = soup.find_all('p')
+            german_text = ""
+            
+            for p in paragraphs:
+                text = p.get_text().strip()
+                if len(text) > 50:  # Only take substantial paragraphs
+                    german_text += text + " "
+                    if len(german_text.split()) > 150:  # Target length
+                        break
+            
+            if not german_text or len(german_text.split()) < 50:
+                # Fallback: Use AI to generate text if web scraping fails
+                german_text = self.generate_german_text_with_ai()
+            
+            self.listening_comprehension_text = german_text[:2000]  # Limit length
+            parent_window.destroy()
+            self.generate_listening_questions()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not fetch German text: {e}")
+    
+    def evaluate_answer(self, user_answer):
+        """Evaluate the user's answer using AI with context of the original text"""
+        try:
+            current_question = self.current_questions[self.current_question_index]
+            
+            prompt = f"""
+            Bewerte die Antwort des Deutschlernenden basierend auf dem Originaltext.
+            
+            ORIGINALTEXT:
+            {self.listening_comprehension_text}
+            
+            FRAGE: {current_question}
+            ANTWORT DES LERNENDEN: {user_answer}
+            
+            Bewertungskriterien:
+            1. Inhaltliche Richtigkeit bezogen auf den Originaltext (0-3 Punkte)
+            2. Sprachliche Angemessenheit und Vollständigkeit (0-1 Punkt) 
+            3. Grammatik und Wortschatz (0-1 Punkt)
+            
+            Maximalpunktzahl: 5 Punkte pro Frage.
+            
+            WICHTIG: Beziehe dich bei der Bewertung explizit auf den Originaltext!
+            Kurze Antworten wie "ja/nein" sollten weniger Punkte erhalten als ausführliche Antworten.
+            
+            Gib deine Bewertung in diesem exakten Format zurück:
+            PUNKTE: [Anzahl der Punkte]/5
+            KOMMENTAR: [Dein konstruktives Feedback auf Deutsch, das sich auf den Text bezieht]
+            """
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+            )
+            
+            evaluation = response.choices[0].message.content.strip()
+            self.process_evaluation(evaluation, user_answer)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not evaluate answer: {e}")
+    
+    def process_evaluation(self, evaluation, user_answer):
+        """Process the AI evaluation and update score"""
+        try:
+            lines = evaluation.split('\n')
+            points = 0
+            comment = ""
+            
+            for line in lines:
+                if line.startswith('PUNKTE:'):
+                    points_text = line.split(':')[1].strip()
+                    points = int(points_text.split('/')[0])
+                elif line.startswith('KOMMENTAR:'):
+                    comment = line.split(':', 1)[1].strip()
+            
+            # Update score
+            self.listening_score += points
+            
+            # Display evaluation in AI responses textbox
+            evaluation_text = f"""
+                Question {self.current_question_index + 1}: {self.current_questions[self.current_question_index]}
+                Your answer: {user_answer}
+                Score: {points}/5
+                Feedback: {comment}
+                {'-'*50}
+                """
+            self.ai_responses_textbox.insert(tk.END, evaluation_text)
+            self.ai_responses_textbox.see(tk.END)
+            
+        except Exception as e:
+            print(f"Error processing evaluation: {e}")
+    
+    def next_listening_question(self, question_text, progress_label, score_label, session_window):
+        """Move to the next question and evaluate the current answer"""
+        if self.current_question_index >= len(self.current_questions):
+            self.finish_listening_session()
+            session_window.destroy()
+            return
+        
+        # Get user's answer from input textbox
+        user_answer = self.input_textbox.get(1.0, tk.END).strip()
+        
+        if not user_answer:
+            messagebox.showwarning("No Answer", "Please type your answer in the input box before proceeding.")
+            return
+        
+        if len(user_answer.split()) < 3:
+            messagebox.showwarning("Short Answer", "Please provide a more detailed answer (at least 3 words).")
+            return
+        
+        # Evaluate the answer
+        self.evaluate_answer(user_answer)
+        
+        # Clear the input box for next question
+        self.input_textbox.delete(1.0, tk.END)
+        
+        # Move to next question
+        self.current_question_index += 1
+        
+        if self.current_question_index < len(self.current_questions):
+            self.display_current_question()
+        else:
+            self.finish_listening_session()
+            session_window.destroy()
+    
+    def finish_listening_session(self):
+        """Display final score and session summary"""
+        final_score = f"""
+            Listening Comprehension Session Completed!
+            Final Score: {self.listening_score}/{self.total_listening_questions * 5}
+            Percentage: {(self.listening_score / (self.total_listening_questions * 5)) * 100:.1f}%
+            """
+        self.ai_responses_textbox.insert(tk.END, final_score)
+        self.ai_responses_textbox.see(tk.END)
+        
+        messagebox.showinfo("Session Complete", 
+                          f"Listening comprehension session completed!\n"
+                          f"Final score: {self.listening_score}/{self.total_listening_questions * 5}")
 
 class NotesEditor:
     def __init__(self, parent):
