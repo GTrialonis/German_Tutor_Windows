@@ -428,8 +428,8 @@ class VocabularyApp:
             pause_button.config(text="Pause")
             status_label.config(text="Reading...", fg="lightgreen")
     
-    def read_text(self, text_content, status_label, progress_var, play_button, pause_button):
-        """Read text using text-to-speech with reliable pause/resume"""
+    def read_text(self, text_content, status_label, progress_var, play_button, pause_button, generate_button=None):
+        """Read text using text-to-speech with reliable pause/resume - UPDATED VERSION"""
         try:
             # Clean up any previous audio files at the start only
             if self.current_audio_file and os.path.exists(self.current_audio_file):
@@ -512,6 +512,10 @@ class VocabularyApp:
             play_button.after(0, lambda: play_button.config(state=tk.NORMAL))
             pause_button.after(0, lambda: pause_button.config(state=tk.DISABLED, text="Pause"))
             
+            # ENABLE THE GENERATE QUESTIONS BUTTON
+            if generate_button:
+                generate_button.after(0, lambda: generate_button.config(state=tk.NORMAL))
+            
         except Exception as e:
             status_label.after(0, lambda: status_label.config(text=f"Error: {str(e)}", fg="red"))
             # Clean up any created files even on error
@@ -523,6 +527,10 @@ class VocabularyApp:
             self.reading_paused = False
             play_button.after(0, lambda: play_button.config(state=tk.NORMAL))
             pause_button.after(0, lambda: pause_button.config(state=tk.DISABLED, text="Pause"))
+            
+            # ENABLE THE GENERATE QUESTIONS BUTTON ON ERROR TOO
+            if generate_button:
+                generate_button.after(0, lambda: generate_button.config(state=tk.NORMAL))
 
     def split_text_for_tts(self, text, max_length=1000):
         """Split text into chunks for TTS, trying to keep sentences intact"""
@@ -1387,7 +1395,7 @@ class VocabularyApp:
                     button_frame,
                     text="LISTENING Comprehension",
                     style='SmallPurple.TButton',
-                    command=self.create_listening_comprehension_questions
+                    command=self.create_listening_comprehension
                 ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
         
         return textbox
@@ -2093,12 +2101,12 @@ class VocabularyApp:
 
 # ---------------- LARGE BLOCK FOR LISTENING COMPREHENSION ---------------
         
-    def create_listening_comprehension_questions(self):
+    def create_listening_comprehension(self):
         """Create the listening comprehension popup window"""
         listen_comp_window = tk.Toplevel(self.root)
         listen_comp_window.title("Listening Comprehension")
         listen_comp_window.configure(bg="#222")
-        listen_comp_window.geometry("400x200")
+        listen_comp_window.geometry("400x250")  # Slightly taller for the new button
         listen_comp_window.transient(self.root)
         listen_comp_window.grab_set()
         
@@ -2113,17 +2121,35 @@ class VocabularyApp:
         frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
         
         ttk.Button(frame, text="Load German Text File", 
-                  style='SmallBlue.TButton',
-                  command=lambda: self.start_listening_from_file(listen_comp_window)).pack(pady=10, fill=tk.X)
+                style='SmallBlue.TButton',
+                command=lambda: self.start_listening_from_file(listen_comp_window)).pack(pady=10, fill=tk.X)
         
         ttk.Button(frame, text="Search Internet for German Text", 
-                  style='SmallGreen.TButton',
-                  command=lambda: self.search_german_text(listen_comp_window)).pack(pady=10, fill=tk.X)
+                style='SmallGreen.TButton',
+                command=lambda: self.search_german_text(listen_comp_window)).pack(pady=10, fill=tk.X)
+        
+        ttk.Button(frame, text="Use Study Text Box Content", 
+                style='SmallLightPurple.TButton',
+                command=lambda: self.use_study_text_for_comprehension(listen_comp_window)).pack(pady=10, fill=tk.X)
         
         ttk.Button(frame, text="Cancel", 
-                  style='SmallRed.TButton',
-                  command=listen_comp_window.destroy).pack(pady=10, fill=tk.X)
+                style='SmallRed.TButton',
+                command=listen_comp_window.destroy).pack(pady=10, fill=tk.X)
     
+
+    def use_study_text_for_comprehension(self, parent_window):
+        """Use the Study Text Box content for listening comprehension"""
+        study_text = self.study_textbox.get(1.0, tk.END).strip()
+        
+        if not study_text:
+            messagebox.showwarning("No Text", "Study Text Box is empty.")
+            return
+        
+        self.listening_comprehension_text = study_text
+        parent_window.destroy()
+        self.generate_listening_questions()
+    
+
     def start_listening_from_file(self, parent_window):
         """Start listening comprehension from a selected text file"""
         filename = filedialog.askopenfilename(
@@ -2136,7 +2162,10 @@ class VocabularyApp:
                 with open(filename, 'r', encoding='utf-8') as file:
                     self.listening_comprehension_text = file.read()
                 parent_window.destroy()
-                self.generate_listening_questions()
+                
+                # Show reading window first, then offer comprehension questions
+                self.show_listening_comprehension_reading_window()
+                
             except Exception as e:
                 messagebox.showerror("Error", f"Could not read file: {e}")
     
@@ -2176,10 +2205,119 @@ class VocabularyApp:
             
             self.listening_comprehension_text = german_text[:2000]  # Limit length
             parent_window.destroy()
-            self.generate_listening_questions()
+            
+            # Show reading window first, then offer comprehension questions
+            self.show_listening_comprehension_reading_window()
             
         except Exception as e:
             messagebox.showerror("Error", f"Could not fetch German text: {e}")
+    
+
+    def show_listening_comprehension_reading_window(self):
+        """Show the reading window for listening comprehension text"""
+        # Create controls window similar to create_listen_functionality
+        controls_window = tk.Toplevel(self.root)
+        controls_window.title("Listen to German Text")
+        controls_window.configure(bg="#222")
+        controls_window.geometry("500x250")  # Wider to accommodate new button
+        controls_window.transient(self.root)
+        
+        # Make window stay on top
+        controls_window.attributes('-topmost', True)
+        
+        # Center the window
+        controls_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (controls_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (controls_window.winfo_height() // 2)
+        controls_window.geometry(f"+{x}+{y}")
+        
+        # Content frame
+        content_frame = tk.Frame(controls_window, bg="#222")
+        content_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        # Source label
+        source_label = tk.Label(content_frame, text="Listen to the German text first, then answer questions", 
+                            bg="#222", fg="white", font=("Helvetica", 10, "bold"))
+        source_label.pack(pady=(0, 10))
+        
+        # Status label
+        status_label = tk.Label(content_frame, text="Ready to read", 
+                            bg="#222", fg="lightgreen", font=("Helvetica", 9))
+        status_label.pack(pady=(0, 10))
+        
+        # Progress bar
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(content_frame, variable=progress_var, maximum=100)
+        progress_bar.pack(fill=tk.X, pady=(0, 15))
+        
+        # Control buttons frame
+        button_frame = tk.Frame(content_frame, bg="#222")
+        button_frame.pack(fill=tk.X)
+        
+        # Control buttons - using the robust reading functionality
+        play_button = ttk.Button(button_frame, text="Start Reading", 
+                                style='SmallGreen.TButton',
+                                command=lambda: self.toggle_reading_listening_comprehension(
+                                    self.listening_comprehension_text, play_button, pause_button, 
+                                    status_label, progress_var, generate_button))
+        play_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        pause_button = ttk.Button(button_frame, text="Pause", 
+                                style='SmallGoldBrown.TButton',
+                                command=lambda: self.toggle_pause(pause_button, status_label),
+                                state=tk.DISABLED)
+        pause_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # NEW: Generate Questions button
+        generate_button = ttk.Button(button_frame, text="Generate Questions", 
+                                    style='SmallDarkPurple.TButton',
+                                    command=lambda: self.generate_listening_questions_after_reading(controls_window),
+                                    state=tk.NORMAL)
+        generate_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        stop_button = ttk.Button(button_frame, text="Close", 
+                                style='SmallRed.TButton',
+                                command=controls_window.destroy)
+        stop_button.pack(side=tk.LEFT)
+        
+        # Store references
+        self.current_controls_window = controls_window
+    
+
+    def toggle_reading_listening_comprehension(self, text_content, play_button, pause_button, status_label, progress_var, generate_button):
+        """Start or resume reading for listening comprehension - UPDATED VERSION"""
+        if not self.is_reading:
+            # Start reading using the robust reading functionality
+            self.is_reading = True
+            self.reading_paused = False
+            play_button.config(state=tk.DISABLED)
+            pause_button.config(state=tk.NORMAL)
+            generate_button.config(state=tk.DISABLED)  # Disable generate button during reading
+            status_label.config(text="Reading...", fg="lightgreen")
+            
+            # Reset progress bar
+            progress_var.set(0)
+            
+            # Start reading in a separate thread using the robust method
+            # PASS generate_button to read_text method
+            self.reading_thread = threading.Thread(
+                target=self.read_text, 
+                args=(text_content, status_label, progress_var, play_button, pause_button, generate_button),
+                daemon=True
+            )
+            self.reading_thread.start()
+        elif self.reading_paused:
+            # Resume reading
+            self.reading_paused = False
+            pygame.mixer.music.unpause()
+            pause_button.config(text="Pause")
+            status_label.config(text="Reading...", fg="lightgreen")
+    
+
+    def generate_listening_questions_after_reading(self, parent_window):
+        """Generate questions after the user has listened to the text"""
+        parent_window.destroy()
+        self.generate_listening_questions()
     
     def generate_german_text_with_ai(self):
         """Generate German text using OpenAI as fallback"""
@@ -2230,10 +2368,34 @@ class VocabularyApp:
         """Generate comprehension questions based on the German text"""
         try:
             # Save the text to a file for later review
-            saved_file = self.save_listening_text()
+            self.save_listening_text()
             
-            # FIRST: Read the entire text to the user
-            self.speak_text_with_controls(self.listening_comprehension_text, saved_file)
+            prompt = f"""
+            Basierend auf dem folgenden deutschen Text, erstelle 3-5 Verständnisfragen auf Deutsch.
+            Die Fragen sollten das Hörverständnis testen und für Deutschlernende geeignet sein.
+            
+            WICHTIG: Gib die Fragen in einem sehr spezifischen Format zurück:
+            
+            FRAGE 1: [Hier kommt die erste Frage]
+            FRAGE 2: [Hier kommt die zweite Frage]
+            FRAGE 3: [Hier kommt die dritte Frage]
+            
+            Text:
+            {self.listening_comprehension_text}
+            
+            Stelle sicher, dass jede Frage mit "FRAGE X:" beginnt und keine zusätzlichen Erklärungen enthält.
+            Die Fragen sollten unterschiedliche Aspekte des Textes abdecken.
+            """
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+            )
+            
+            questions_text = response.choices[0].message.content.strip()
+            self.parse_questions(questions_text)
+            self.start_listening_session()
             
         except Exception as e:
             messagebox.showerror("Error", f"Could not generate questions: {e}")
