@@ -2821,7 +2821,7 @@ class VocabularyApp:
                     voice=voice,
                     input=text,
                 )
-                response.stream_to_file(audio_file)
+                response.with_streaming_response.method()(audio_file)
             except Exception as e:
                 # Fallback to gTTS if OpenAI fails
                 print(f"OpenAI TTS failed, using gTTS: {e}")
