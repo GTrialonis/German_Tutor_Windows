@@ -215,6 +215,11 @@ class VocabularyApp:
                     foreground='white',
                     font=self.small_button_font)
 
+        self.style.configure('SmallGoldYellow.TButton',
+                    background="#EBCE65",
+                    foreground='black',
+                    font=self.small_button_font) # For LISTENING Comprehension Button
+        
         self.style.configure('SmallBlueish.TButton',
                     background='#5D6D7E',
                     foreground='white',
@@ -420,6 +425,37 @@ class VocabularyApp:
         self.show_reading_controls(text_content, "Study Text Box", voice)
     
 
+    def show_listening_text_reading_controls(self):
+        """Show reading controls for the listening comprehension text"""
+        if not self.listening_comprehension_text:
+            messagebox.showwarning("No Text", "No German text available to read.")
+            return
+        
+        # Use the selected voice (default to alloy if not set)
+        voice = getattr(self, 'current_voice', 'alloy')
+        
+        # Show reading controls popup
+        self.show_reading_controls(
+            self.listening_comprehension_text, 
+            "Listening Comprehension Text", 
+            voice
+        )
+        
+        # After reading is done, generate questions
+        self.check_reading_complete_and_generate_questions()
+
+    def check_reading_complete_and_generate_questions(self):
+        """Check if reading is complete and then generate questions"""
+        def check():
+            if not self.is_reading:
+                # Reading is complete, now generate questions
+                self.root.after(1000, self.generate_listening_questions)
+            else:
+                # Check again in 1 second
+                self.root.after(1000, check)
+        
+        check()
+
     def show_reading_controls(self, text_content, source_name, voice):
         """Show the reading controls window"""
         # Stop any current reading
@@ -464,10 +500,12 @@ class VocabularyApp:
         button_frame = tk.Frame(content_frame, bg="#222")
         button_frame.pack(fill=tk.X)
         
-        # Control buttons
+        # Control buttons - UPDATE the play_button command to generate questions after reading
         play_button = ttk.Button(button_frame, text="Start Reading", 
                                 style='SmallGreen.TButton',
-                                command=lambda: self.toggle_reading(text_content, play_button, pause_button, status_label, progress_var, voice))
+                                command=lambda: self.start_reading_and_generate_questions(
+                                    text_content, play_button, pause_button, status_label, progress_var, voice, controls_window
+                                ))
         play_button.pack(side=tk.LEFT, padx=(0, 10))
         
         pause_button = ttk.Button(button_frame, text="Pause", 
@@ -486,7 +524,51 @@ class VocabularyApp:
                             lambda: self.stop_reading_ui(controls_window, play_button, pause_button, status_label, progress_var))
         
         self.current_controls_window = controls_window
+
     
+    def start_reading_and_generate_questions(self, text_content, play_button, pause_button, status_label, progress_var, voice, controls_window):
+        """Start reading and set up question generation after completion"""
+        # Start the reading
+        self.toggle_reading(text_content, play_button, pause_button, status_label, progress_var, voice)
+        
+        # Set up completion handler
+        def check_reading_complete():
+            if not self.is_reading:
+                # Reading complete, close reading window and generate questions
+                controls_window.destroy()
+                self.generate_listening_questions()
+            else:
+                # Check again in 1 second
+                self.root.after(1000, check_reading_complete)
+        
+        check_reading_complete()
+
+    
+    def handle_listening_answer(self):
+        """Handle when user submits an answer during listening comprehension"""
+        if not hasattr(self, 'current_questions') or not self.current_questions:
+            # Not in listening comprehension mode, use regular AI
+            self.prompt_ai()
+            return
+        
+        # We're in listening comprehension mode - evaluate the answer
+        user_answer = self.input_textbox.get(1.0, tk.END).strip()
+        
+        if not user_answer:
+            messagebox.showwarning("No Answer", "Please type your answer before submitting.")
+            return
+        
+        if len(user_answer.split()) < 3:
+            messagebox.showwarning("Short Answer", "Please provide a more detailed answer (at least 3 words).")
+            return
+        
+        # Evaluate the current answer - BUT DON'T CLEAR THE INPUT
+        self.evaluate_answer(user_answer)
+        
+        # DO NOT clear input here - let the "Next Question" button handle it
+        # self.input_textbox.delete(1.0, tk.END)
+    
+
     def toggle_reading(self, text_content, play_button, pause_button, status_label, progress_var, voice):
         """Start or resume reading"""
         if not self.is_reading:
@@ -699,32 +781,33 @@ class VocabularyApp:
         if not audio_file or not os.path.exists(audio_file):
             return
         
-        for attempt in range(max_retries):
+        def try_cleanup():
             try:
                 # Ensure pygame has released the file
                 if pygame.mixer.music.get_busy():
                     pygame.mixer.music.stop()
-                pygame.time.wait(200 * (attempt + 1))  # Increasing delay
+                pygame.time.wait(500)  # Longer delay
                 
                 os.unlink(audio_file)
                 print(f"Successfully cleaned up audio file: {audio_file}")
-                return True  # Success
-                
+                return True
             except Exception as e:
-                print(f"Cleanup attempt {attempt + 1} failed for {audio_file}: {e}")
-                if attempt == max_retries - 1:  # Last attempt
-                    print(f"Could not delete {audio_file}, will retry later")
-                    # Schedule another cleanup attempt
-                    self.root.after(5000, lambda: self.safe_cleanup_audio_file(audio_file, 2))
-                    return False
+                print(f"Cleanup failed for {audio_file}: {e}")
+                return False
         
-        return False
+        # Try immediate cleanup
+        if try_cleanup():
+            return
+        
+        # If immediate cleanup fails, schedule retries
+        for attempt in range(max_retries):
+            self.root.after(2000 * (attempt + 1), lambda: try_cleanup())
     
     # Keep this for backward compatibility or remove if not used elsewhere
-    def cleanup_audio_files(self, audio_files):
-        """Clean up multiple audio files (legacy function - use safe_cleanup_audio_file for new code)"""
-        for audio_file in audio_files:
-            self.safe_cleanup_audio_file(audio_file)
+    # def cleanup_audio_files(self, audio_files):
+    #     """Clean up multiple audio files (legacy function - use safe_cleanup_audio_file for new code)"""
+    #     for audio_file in audio_files:
+    #         self.safe_cleanup_audio_file(audio_file)
 
 
     def read_single_chunk(self, text, chunk_info=""):
@@ -1294,6 +1377,13 @@ class VocabularyApp:
 
         ttk.Button(
             left_frame,
+            text="Eval.Answer",
+            style='SmallGoldYellow.TButton',
+            command=self.handle_listening_answer
+        ).pack(side='left', padx=(10, 3), pady=3)
+
+        ttk.Button(
+            left_frame,
             text="Clear Prompt",
             style='SmallRed.TButton',
             command=self.clear_input_textbox
@@ -1521,7 +1611,7 @@ class VocabularyApp:
                 ttk.Button(
                     button_frame,
                     text="LISTENING Comprehension",
-                    style='SmallPurple.TButton',
+                    style='SmallGoldYellow.TButton',
                     command=self.create_listening_comprehension
                 ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
         
@@ -2303,10 +2393,6 @@ class VocabularyApp:
 
     def start_listening_from_file(self, parent_window, voice="alloy"):
         """Start listening comprehension from a selected German text file and play it aloud."""
-        from openai import OpenAI
-        import tempfile, os, time, pygame
-        from tkinter import filedialog, messagebox
-
         filename = filedialog.askopenfilename(
             title="Select German Text File",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
@@ -2322,55 +2408,75 @@ class VocabularyApp:
             parent_window.destroy()
             self.current_voice = voice  # Store selected voice
 
-            # --- Speak the loaded text (calls helper below)
-            self.speak_text_with_tts(self.listening_comprehension_text, voice=voice)
-
-            # --- Continue to the next step (your logic)
-            self.generate_listening_questions()
+            # Show reading controls FIRST
+            self.show_reading_controls(
+                self.listening_comprehension_text, 
+                f"File: {os.path.basename(filename)}", 
+                voice
+            )
 
         except Exception as e:
             messagebox.showerror("Error", f"Could not read file: {e}")
 
 
     def speak_text_with_tts(self, text, voice="alloy"):
-        """Generate and play speech from text using OpenAI TTS."""
+        """Generate and play speech from text using OpenAI TTS safely, even for long input."""
+        import re, tempfile, os, time, pygame
         from openai import OpenAI
-        import tempfile, os, time, pygame
 
         client = OpenAI()
 
-        # Create temporary MP3 file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
-            temp_path = tmp.name
+        # --- Split text into safe chunks (~400 chars each, on sentence boundaries)
+        sentences = re.split(r'(?<=[.!?]) +', text.strip())
+        chunks = []
+        current = ""
+        for s in sentences:
+            if len(current) + len(s) < 400:
+                current += " " + s
+            else:
+                chunks.append(current.strip())
+                current = s
+        if current:
+            chunks.append(current.strip())
+
+        pygame.mixer.init()
 
         try:
-            # Generate speech (current correct method)
-            with client.audio.speech.with_streaming_response.create(
-                model="gpt-4o-mini-tts",
-                voice=voice,
-                input=text
-            ) as response:
-                response.stream_to_file(temp_path)
+            for chunk in chunks:
+                # Create temp MP3 file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                    temp_path = tmp.name
 
-            # Play the MP3
-            pygame.mixer.init()
-            pygame.mixer.music.load(temp_path)
-            pygame.mixer.music.play()
+                # Generate and save speech
+                with client.audio.speech.with_streaming_response.create(
+                    model="gpt-4o-mini-tts",
+                    voice=voice,
+                    input=chunk
+                ) as response:
+                    response.stream_to_file(temp_path)
 
-            while pygame.mixer.music.get_busy():
-                time.sleep(0.1)
+                # Play the MP3
+                pygame.mixer.music.load(temp_path)
+                pygame.mixer.music.play()
 
-            pygame.mixer.quit()
+                # Wait until finished
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+
+                # Stop music and safely delete file
+                pygame.mixer.music.unload()
+                try:
+                    os.remove(temp_path)
+                    print(f"Cleaned up {temp_path}")
+                except PermissionError:
+                    print(f"Could not delete {temp_path}, will retry later")
 
         except Exception as e:
-            print(f"Speech generation error: {e}")
+            print(f"TTS playback error: {e}")
 
         finally:
-            # Try to remove file safely
-            try:
-                os.remove(temp_path)
-            except PermissionError:
-                pass
+            pygame.mixer.quit()
+
 
 
     
@@ -2416,7 +2522,13 @@ class VocabularyApp:
 
             self.current_voice = voice  # Store the selected voice
             parent_window.destroy()
-            self.generate_listening_questions()
+            # self.generate_listening_questions()
+
+            # self.current_voice = voice  # Store the selected voice
+            # parent_window.destroy()
+            
+            # SHOW READING POPUP FIRST instead of directly generating questions
+            self.show_listening_text_reading_controls()
             
         except Exception as e:
             messagebox.showerror("Error", f"Could not fetch German text: {e}")
@@ -2650,6 +2762,10 @@ class VocabularyApp:
         reading_window.destroy()
         self.generate_questions_after_reading()
 
+# ------ Started adding revised blocks of code -------
+
+
+
     def generate_questions_after_reading(self):
         """Generate questions after the text has been read"""
         try:
@@ -2752,8 +2868,8 @@ class VocabularyApp:
         repeat_button.pack(side=tk.LEFT, padx=(0, 10))
         
         next_button = ttk.Button(button_frame, text="Next Question", 
-                                style='SmallGreen.TButton',
-                                command=lambda: self.next_listening_question(question_text, progress_label, score_label, session_window))
+                        style='SmallGreen.TButton',
+                        command=lambda: self.next_listening_question(session_window))
         next_button.pack(side=tk.LEFT, padx=(0, 10))
         
         exit_button = ttk.Button(button_frame, text="Exit", 
@@ -2795,13 +2911,19 @@ class VocabularyApp:
             self.finish_listening_session()
 
     def speak_current_question(self):
-        """Speak the current question using TTS with selected voice"""
+        """Speak the current question using TTS"""
         if self.current_question_index < len(self.current_questions):
             question = self.current_questions[self.current_question_index]
             
-            # Use the selected voice
-            voice = getattr(self, 'current_voice', 'alloy')  # Default to alloy if not set
+            # Stop any current speech first
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.stop()
+                pygame.time.wait(200)  # Wait for stop to complete
             
+            # Use the selected voice
+            voice = getattr(self, 'current_voice', 'alloy')
+            
+            # Speak in a new thread
             threading.Thread(
                 target=self.speak_text, 
                 args=(question, voice),
@@ -2811,6 +2933,10 @@ class VocabularyApp:
     def speak_text(self, text, voice="alloy"):
         """Speak text using TTS - simplified version for questions and general use"""
         try:
+            # Ensure pygame mixer is initialized
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            
             # Use OpenAI TTS
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
                 audio_file = temp_audio.name
@@ -2821,7 +2947,8 @@ class VocabularyApp:
                     voice=voice,
                     input=text,
                 )
-                response.with_streaming_response.method()(audio_file)
+                # FIX: Use write_to_file instead of stream_to_file
+                response.write_to_file(audio_file)
             except Exception as e:
                 # Fallback to gTTS if OpenAI fails
                 print(f"OpenAI TTS failed, using gTTS: {e}")
@@ -3043,41 +3170,55 @@ class VocabularyApp:
             messagebox.showerror("Error", f"Could not evaluate answer: {e}")
     
     def process_evaluation(self, evaluation, user_answer):
-        """Process the AI evaluation and update score"""
+        """Process the AI evaluation and update score - show only evaluation"""
         try:
             lines = evaluation.split('\n')
             points = 0
             comment = ""
+            evaluation_found = False
             
             for line in lines:
+                line = line.strip()
                 if line.startswith('PUNKTE:'):
                     points_text = line.split(':')[1].strip()
                     points = int(points_text.split('/')[0])
+                    evaluation_found = True
                 elif line.startswith('KOMMENTAR:'):
                     comment = line.split(':', 1)[1].strip()
+                    evaluation_found = True
+                elif line.startswith('Question') or line.startswith('Your answer') or line.startswith('Score') or line.startswith('Feedback'):
+                    evaluation_found = True
             
-            # Update score
-            self.listening_score += points
-            
-            # Display evaluation in AI responses textbox
-            evaluation_text = f"""
-                Question {self.current_question_index + 1}: {self.current_questions[self.current_question_index]}
-                Your answer: {user_answer}
-                Score: {points}/5
-                Feedback: {comment}
-                {'-'*50}
-                """
-            self.ai_responses_textbox.insert(tk.END, evaluation_text)
-            self.ai_responses_textbox.see(tk.END)
-            
+            # Only update score and display if we found evaluation content
+            if evaluation_found:
+                # Update score
+                self.listening_score += points
+                
+                # Display ONLY the evaluation in AI responses textbox
+                evaluation_text = f"""
+                    Question {self.current_question_index + 1}: {self.current_questions[self.current_question_index]}
+                    Your answer: {user_answer}
+                    Score: {points}/5
+                    Feedback: {comment}
+                    {'-'*50}
+                    """
+                self.ai_responses_textbox.insert(tk.END, evaluation_text)
+                self.ai_responses_textbox.see(tk.END)
+            else:
+                # If no evaluation format found, show raw response but indicate it's the full response
+                self.ai_responses_textbox.insert(tk.END, f"\nFull AI Response:\n{evaluation}\n{'-'*50}\n")
+                self.ai_responses_textbox.see(tk.END)
+                
         except Exception as e:
             print(f"Error processing evaluation: {e}")
+            # Show error message
+            self.ai_responses_textbox.insert(tk.END, f"\nError processing evaluation: {e}\n{'-'*50}\n")
+            self.ai_responses_textbox.see(tk.END)
     
-    def next_listening_question(self, question_text, progress_label, score_label, session_window):
+    def next_listening_question(self, session_window):
         """Move to the next question and evaluate the current answer"""
         if self.current_question_index >= len(self.current_questions):
             self.finish_listening_session()
-            session_window.destroy()
             return
         
         # Get user's answer from input textbox
