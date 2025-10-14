@@ -225,13 +225,6 @@ class VocabularyApp:
                     foreground='white',
                     font=self.small_button_font)
 
-        # Add this to your style configurations in __init__
-        # self.style.configure('SmallPurple.TButton',
-        #             background='#ca74ea',
-        #             foreground='black',
-        #             font=self.small_button_font)  # Use the same small font as other buttons
-
-
         # Left Section - Vocabulary, Study Text, and Translation Boxes
         self.create_left_section()
 
@@ -247,8 +240,10 @@ class VocabularyApp:
         # Create a smaller font for the highlight buttons
         self.small_button_font = tkFont.Font(family="Helvetica", size=8, weight="normal")
 
-        # Update label colors to gold - ADD THIS LINE
-        # self.update_label_colors_to_gold()
+        self.evaluated_questions = set()  # Track which questions have been evaluated
+
+        # Ensure Prompt AI button is enabled on startup
+        self.root.after(100, self.ensure_prompt_ai_enabled)
     
     # --- REFOCUS THE CURSON INSIDE THE TEST INPUT ---
     def trigger_next_word_and_refocus(self, event=None):
@@ -325,7 +320,7 @@ class VocabularyApp:
         listen_comp_window = tk.Toplevel(self.root)
         listen_comp_window.title("Listening Comprehension")
         listen_comp_window.configure(bg="#222")
-        listen_comp_window.geometry("400x250")  # Increased height for voice selection
+        listen_comp_window.geometry("400x250")
         listen_comp_window.transient(self.root)
         listen_comp_window.grab_set()
         
@@ -339,7 +334,7 @@ class VocabularyApp:
         frame = tk.Frame(listen_comp_window, bg="#222")
         frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
         
-        # Voice selection
+        # Voice selection - DEFINE THIS FIRST
         voice_label = tk.Label(frame, text="Select Voice:", bg="#222", fg="white")
         voice_label.pack(anchor=tk.W, pady=(0, 5))
         
@@ -356,13 +351,14 @@ class VocabularyApp:
                             bg="#222", fg="white", selectcolor="#444")
             rb.pack(side=tk.LEFT, padx=(0, 10))
         
+        # NOW create buttons that use voice_var - it's defined now
         ttk.Button(frame, text="Load German Text File", 
                 style='SmallBlue.TButton',
-                command=lambda: self.start_listening_from_file(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
+                command=lambda v=voice_var.get(): self.start_listening_from_file(listen_comp_window, v)).pack(pady=5, fill=tk.X)
         
         ttk.Button(frame, text="Search Internet for German Text", 
                 style='SmallGreen.TButton',
-                command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
+                command=lambda v=voice_var.get(): self.search_german_text(listen_comp_window, v)).pack(pady=5, fill=tk.X)
         
         ttk.Button(frame, text="Cancel", 
                 style='SmallRed.TButton',
@@ -547,11 +543,9 @@ class VocabularyApp:
     def handle_listening_answer(self):
         """Handle when user submits an answer during listening comprehension"""
         if not hasattr(self, 'current_questions') or not self.current_questions:
-            # Not in listening comprehension mode, use regular AI
             self.prompt_ai()
             return
         
-        # We're in listening comprehension mode - evaluate the answer
         user_answer = self.input_textbox.get(1.0, tk.END).strip()
         
         if not user_answer:
@@ -562,11 +556,15 @@ class VocabularyApp:
             messagebox.showwarning("Short Answer", "Please provide a more detailed answer (at least 3 words).")
             return
         
-        # Evaluate the current answer - BUT DON'T CLEAR THE INPUT
-        self.evaluate_answer(user_answer)
+        # Check if this question has already been evaluated
+        current_q_index = self.current_question_index
+        if current_q_index in self.evaluated_questions:
+            messagebox.showinfo("Already Evaluated", "This question has already been evaluated. Please proceed to next question.")
+            return
         
-        # DO NOT clear input here - let the "Next Question" button handle it
-        # self.input_textbox.delete(1.0, tk.END)
+        # Evaluate and mark as evaluated
+        self.evaluate_answer(user_answer)
+        self.evaluated_questions.add(current_q_index)
     
 
     def toggle_reading(self, text_content, play_button, pause_button, status_label, progress_var, voice):
@@ -776,38 +774,37 @@ class VocabularyApp:
         
         return chunks if chunks else [text]
     
-    def safe_cleanup_audio_file(self, audio_file, max_retries=3):
-        """Safely clean up audio files with retry logic"""
+    def safe_cleanup_audio_file(self, audio_file):
+        """Simple file cleanup - just try once and log if it fails"""
         if not audio_file or not os.path.exists(audio_file):
             return
         
-        def try_cleanup():
+        try:
+            # Just try to delete it once
+            os.unlink(audio_file)
+        except Exception as e:
+            # If it fails, schedule one retry after 10 seconds
+            print(f"Initial cleanup failed for {audio_file}: {e}")
+            self.root.after(10000, lambda: self.final_cleanup(audio_file))
+
+    def delayed_cleanup(self, audio_file):
+        """Delayed cleanup attempt"""
+        if os.path.exists(audio_file):
             try:
-                # Ensure pygame has released the file
-                if pygame.mixer.music.get_busy():
-                    pygame.mixer.music.stop()
-                pygame.time.wait(500)  # Longer delay
-                
                 os.unlink(audio_file)
-                print(f"Successfully cleaned up audio file: {audio_file}")
-                return True
+                print(f"Delayed cleanup successful: {audio_file}")
+            except:
+                print(f"Delayed cleanup failed: {audio_file}")
+
+    def final_cleanup(self, audio_file):
+        """Final cleanup attempt"""
+        if os.path.exists(audio_file):
+            try:
+                os.unlink(audio_file)
+                print(f"Final cleanup successful: {audio_file}")
             except Exception as e:
-                print(f"Cleanup failed for {audio_file}: {e}")
-                return False
-        
-        # Try immediate cleanup
-        if try_cleanup():
-            return
-        
-        # If immediate cleanup fails, schedule retries
-        for attempt in range(max_retries):
-            self.root.after(2000 * (attempt + 1), lambda: try_cleanup())
-    
-    # Keep this for backward compatibility or remove if not used elsewhere
-    # def cleanup_audio_files(self, audio_files):
-    #     """Clean up multiple audio files (legacy function - use safe_cleanup_audio_file for new code)"""
-    #     for audio_file in audio_files:
-    #         self.safe_cleanup_audio_file(audio_file)
+                print(f"Permanent cleanup failure for {audio_file}: {e}")
+                # Don't retry further - these are temp files that will be cleaned up by system eventually
 
 
     def read_single_chunk(self, text, chunk_info=""):
@@ -1368,12 +1365,13 @@ class VocabularyApp:
 
 
         # Add the AI prompt buttons
-        ttk.Button(
+        self.prompt_ai_button = ttk.Button(
             left_frame,
             text="Prompt AI",
             style='SmallPurple.TButton',
             command=self.prompt_inputbox
-        ).pack(side='left', padx=(10, 3), pady=3)
+        )
+        self.prompt_ai_button.pack(side='left', padx=(10, 3), pady=3)
 
         ttk.Button(
             left_frame,
@@ -2343,11 +2341,11 @@ class VocabularyApp:
 # ---------------- LARGE BLOCK FOR LISTENING COMPREHENSION ---------------
         
     def create_listening_comprehension(self):
-        """Create the listening comprehension popup window"""
+        """Create the listening comprehension popup window with voice selection"""
         listen_comp_window = tk.Toplevel(self.root)
         listen_comp_window.title("Listening Comprehension")
         listen_comp_window.configure(bg="#222")
-        listen_comp_window.geometry("400x250")  # Slightly taller for the new button
+        listen_comp_window.geometry("400x250")
         listen_comp_window.transient(self.root)
         listen_comp_window.grab_set()
         
@@ -2361,21 +2359,35 @@ class VocabularyApp:
         frame = tk.Frame(listen_comp_window, bg="#222")
         frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
         
+        # Voice selection - DEFINE THIS FIRST
+        voice_label = tk.Label(frame, text="Select Voice:", bg="#222", fg="white")
+        voice_label.pack(anchor=tk.W, pady=(0, 5))
+        
+        voice_var = tk.StringVar(value="alloy")  # Default voice
+        
+        voice_frame = tk.Frame(frame, bg="#222")
+        voice_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        voices = [("Alloy", "alloy"), ("Echo", "echo"), ("Fable", "fable"), 
+                ("Onyx", "onyx"), ("Nova", "nova"), ("Shimmer", "shimmer")]
+        
+        for i, (name, value) in enumerate(voices):
+            rb = tk.Radiobutton(voice_frame, text=name, variable=voice_var, value=value,
+                            bg="#222", fg="white", selectcolor="#444")
+            rb.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Create buttons - use a different approach to get the voice value
         ttk.Button(frame, text="Load German Text File", 
                 style='SmallBlue.TButton',
-                command=lambda: self.start_listening_from_file(listen_comp_window)).pack(pady=10, fill=tk.X)
+                command=lambda: self.start_listening_from_file(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
         
         ttk.Button(frame, text="Search Internet for German Text", 
                 style='SmallGreen.TButton',
-                command=lambda: self.search_german_text(listen_comp_window)).pack(pady=10, fill=tk.X)
-        
-        ttk.Button(frame, text="Use Study Text Box Content", 
-                style='SmallLightPurple.TButton',
-                command=lambda: self.use_study_text_for_comprehension(listen_comp_window)).pack(pady=10, fill=tk.X)
+                command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
         
         ttk.Button(frame, text="Cancel", 
                 style='SmallRed.TButton',
-                command=listen_comp_window.destroy).pack(pady=10, fill=tk.X)
+                command=listen_comp_window.destroy).pack(pady=5, fill=tk.X)
     
 
     def use_study_text_for_comprehension(self, parent_window):
@@ -2389,6 +2401,12 @@ class VocabularyApp:
         self.listening_comprehension_text = study_text
         parent_window.destroy()
         self.generate_listening_questions()
+
+
+    def ensure_prompt_ai_enabled(self):
+        """Safety function to ensure Prompt AI button is always enabled"""
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state=tk.NORMAL)
     
 
     def start_listening_from_file(self, parent_window, voice="alloy"):
@@ -2808,6 +2826,14 @@ class VocabularyApp:
 
     def start_listening_session(self):
         """Start the listening comprehension session"""
+        # Reset evaluation tracking
+        self.evaluated_questions = set()
+        
+        # Disable Prompt AI button
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state=tk.DISABLED)
+            # ------- FINISH DISABLE BUTTON ---------------
+
         print(f"Starting listening session with {len(self.current_questions)} questions")  # Debug
         
         if not self.current_questions:
@@ -2873,8 +2899,9 @@ class VocabularyApp:
         next_button.pack(side=tk.LEFT, padx=(0, 10))
         
         exit_button = ttk.Button(button_frame, text="Exit", 
-                                style='SmallRed.TButton',
-                                command=session_window.destroy)
+                        style='SmallRed.TButton',
+                        command=lambda: self.stop_listening_session(session_window))
+        
         exit_button.pack(side=tk.LEFT)
         
         # Store references
@@ -2889,6 +2916,53 @@ class VocabularyApp:
         self.display_current_question()
         
         print("First question displayed")  # Debug
+
+
+    def finish_listening_session(self):
+        """Display final score and session summary"""
+        # Re-enable Prompt AI button
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state=tk.NORMAL)
+        
+        final_score = f"""
+    Listening Comprehension Session Completed!
+    Final Score: {self.listening_score}/{self.total_listening_questions * 5}
+    Percentage: {(self.listening_score / (self.total_listening_questions * 5)) * 100:.1f}%
+    """
+        self.ai_responses_textbox.insert(tk.END, final_score)
+        self.ai_responses_textbox.see(tk.END)
+        
+        messagebox.showinfo("Session Complete", 
+                        f"Listening comprehension session completed!\n"
+                        f"Final score: {self.listening_score}/{self.total_listening_questions * 5}")
+        
+    def stop_listening_session(self, session_window):
+        """Stop the listening session early (when user clicks Exit) - ADD THIS NEW FUNCTION"""
+        # Re-enable Prompt AI button
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state=tk.NORMAL)
+        
+        # Stop any current speech
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+        
+        # Clear session state
+        self.is_reading = False
+        self.reading_paused = False
+        
+        # Close session window if it exists
+        if session_window and session_window.winfo_exists():
+            session_window.destroy()
+        
+        # Clear references
+        if hasattr(self, 'current_session_window'):
+            del self.current_session_window
+        if hasattr(self, 'current_questions'):
+            self.current_questions = []
+        if hasattr(self, 'evaluated_questions'):
+            self.evaluated_questions = set()
+        
+        print("Listening session stopped and cleaned up")
 
     def display_current_question(self):
         """Display the current question and speak it"""
@@ -3083,7 +3157,7 @@ class VocabularyApp:
             print(f"Could not save listening text: {e}")
             return "Unknown source"
     
-    def search_german_text(self, parent_window):
+    def search_german_text(self, parent_window, voice):
         """Search for a German text online"""
         try:
             # Common German news and content websites
@@ -3091,7 +3165,7 @@ class VocabularyApp:
                 "https://www.dw.com/de/themen/s-9077",
                 "https://www.tagesschau.de/",
                 "https://www.spiegel.de/thema/aktuelles/",
-                "https://www.zeit.de/aktuelles",
+                "https://www.zeit.de/aktuelles"
                 "https://www.giz.de/de/regionen?r=africa",
                 "https://www.giz.de/de/regionen?r=asia",
                 "https://www.giz.de/de/regionen?r=europe",
@@ -3119,7 +3193,17 @@ class VocabularyApp:
             
             self.listening_comprehension_text = german_text[:2000]  # Limit length
             parent_window.destroy()
-            self.generate_listening_questions()
+            self.current_voice = voice  # Store the selected voice
+            
+            # Save the text FIRST
+            self.save_listening_text()
+            
+            # THEN show reading controls (same as file loading)
+            self.show_reading_controls(
+                self.listening_comprehension_text, 
+                "Internet German Text", 
+                voice
+            )
             
         except Exception as e:
             messagebox.showerror("Error", f"Could not fetch German text: {e}")
@@ -3130,32 +3214,26 @@ class VocabularyApp:
             current_question = self.current_questions[self.current_question_index]
             
             prompt = f"""
-            Bewerte die Antwort des Deutschlernenden basierend NUR auf dem Originaltext.
-            Evaulate the answer of the lerner ONLY on the basis of the original text read.
-            ORIGINALTEXT:
-            {self.listening_comprehension_text}
-            
-            FRAGE: {current_question}
-            ANTWORT DES LERNENDEN: {user_answer}
-            
-            Bewertungskriterien:
-            1. Inhaltliche Richtigkeit bezogen auf den Originaltext (0-3 Punkte)
-            2. Sprachliche Angemessenheit und Vollständigkeit (0-1 Punkt) 
-            3. Grammatik und Wortschatz (0-1 Punkt)
-            
-            Maximalpunktzahl: 5 Punkte pro Frage.
-            
-            WICHTIG: Beziehe dich bei der Bewertung explizit auf den Originaltext!
-            Kurze Antworten wie "ja/nein" sollten weniger Punkte erhalten als ausführliche Antworten.
-            
-            Gib deine Bewertung in diesem exakten Format zurück:
-            PUNKTE: [Anzahl der Punkte]/5
-            KOMMENTAR: [Der Lernende kann seine eigenen Worte verwenden, um eine Antwort auf die \
-                Frage zu geben, aber seine Antwort sollte das Wesentliche der Frage abdecken. Wenn \
-                dies nur teilweise geschieht, machen Sie den Lernenden auf den Punkt oder die Punkte \
-                aufmerksam, die er in seiner Antwort hätte einbeziehen sollen. "Wichtig: Ihre \
-                Kommentare sollten sich ausschließlich auf den Text beziehen und NICHT auf andere, externe Quellen."]
-            """
+                Bewerte die folgende Antwort auf die Frage. Die Antwort sollte inhaltlich korrekt, grammatikalisch richtig und in vollständigen Sätzen auf Deutsch sein.
+
+                FRAGE: {current_question}
+                ANTWORD DES LERNENDEN: {user_answer}
+
+                Bewertungskriterien:
+                1. Inhaltliche Richtigkeit (0-2 Punkte)
+                2. Sprachliche Angemessenheit und Vollständigkeit (0-1 Punkt) 
+                3. Grammatik und Syntax (0-1 Punkt)
+                4. Wortschatz und Ausdruck (0-1 Punkt)
+
+                Maximalpunktzahl: 5 Punkte pro Frage.
+
+                WENN die Antwort grammatikalische oder syntaktische Fehler enthält, biete eine korrigierte Version an.
+
+                Gib deine Bewertung in diesem Format zurück:
+                PUNKTE: [Anzahl der Punkte]/5
+                KOMMENTAR: [Dein konstruktives Feedback auf Deutsch]
+                KORREKTUR: [Falls nötig, eine grammatikalisch korrekte Alternative, sonst leer lassen]
+                """
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -3216,29 +3294,26 @@ class VocabularyApp:
             self.ai_responses_textbox.see(tk.END)
     
     def next_listening_question(self, session_window):
-        """Move to the next question and evaluate the current answer"""
+        """Move to the next question"""
         if self.current_question_index >= len(self.current_questions):
             self.finish_listening_session()
             return
         
-        # Get user's answer from input textbox
+        # Get user's answer
         user_answer = self.input_textbox.get(1.0, tk.END).strip()
         
-        if not user_answer:
-            messagebox.showwarning("No Answer", "Please type your answer in the input box before proceeding.")
-            return
+        # Only evaluate if not already evaluated and answer exists
+        current_q_index = self.current_question_index
+        if user_answer and current_q_index not in self.evaluated_questions:
+            if len(user_answer.split()) >= 3:
+                self.evaluate_answer(user_answer)
+                self.evaluated_questions.add(current_q_index)
+            else:
+                messagebox.showwarning("Short Answer", "Please provide a more detailed answer (at least 3 words) or clear the box to proceed.")
+                return
         
-        if len(user_answer.split()) < 3:
-            messagebox.showwarning("Short Answer", "Please provide a more detailed answer (at least 3 words).")
-            return
-        
-        # Evaluate the answer
-        self.evaluate_answer(user_answer)
-        
-        # Clear the input box for next question
+        # Clear input and move to next question
         self.input_textbox.delete(1.0, tk.END)
-        
-        # Move to next question
         self.current_question_index += 1
         
         if self.current_question_index < len(self.current_questions):
@@ -3246,20 +3321,6 @@ class VocabularyApp:
         else:
             self.finish_listening_session()
             session_window.destroy()
-    
-    def finish_listening_session(self):
-        """Display final score and session summary"""
-        final_score = f"""
-            Listening Comprehension Session Completed!
-            Final Score: {self.listening_score}/{self.total_listening_questions * 5}
-            Percentage: {(self.listening_score / (self.total_listening_questions * 5)) * 100:.1f}%
-            """
-        self.ai_responses_textbox.insert(tk.END, final_score)
-        self.ai_responses_textbox.see(tk.END)
-        
-        messagebox.showinfo("Session Complete", 
-                          f"Listening comprehension session completed!\n"
-                          f"Final score: {self.listening_score}/{self.total_listening_questions * 5}")
 
 class NotesEditor:
     def __init__(self, parent):
