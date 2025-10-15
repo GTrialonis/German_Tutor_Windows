@@ -1351,11 +1351,19 @@ class VocabularyApp:
             self.root.after(0, messagebox.showerror, "Examples Error", f"An error occurred: {e}")
 
 
-
     def create_left_section(self):
         font = self.left_section_font
         left_frame = tk.Frame(self.root, bg="#222")
         left_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        # Create vocabulary section with search functionality
+        vocab_frame = tk.Frame(left_frame, bg="#222")
+        vocab_frame.pack(fill=tk.X, padx=5, pady=(5, 0))
+        
+        # Vocabulary label and search button
+        # label_frame = tk.Frame(vocab_frame, bg="#222")
+        # label_frame.pack(fill=tk.X)
+        
         
         # Create textboxes - only add highlight buttons to Study Text Box and Translation Box
         self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=10, label_font=font, add_buttons=False)
@@ -1394,6 +1402,218 @@ class VocabularyApp:
             command=lambda: self.en_to_de_translation()
         ).pack(side='left', padx=3, pady=3)
 
+
+    def show_vocabulary_search(self):
+        """Simplified vocabulary search popup"""
+        # Check if vocabulary textbox is empty
+        vocab_content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+        if not vocab_content:
+            messagebox.showwarning("Empty Vocabulary", "Please load a vocabulary file (_VOC.txt) first.")
+            return
+        
+        # Only create the search window if vocabulary has content
+        search_window = tk.Toplevel(self.root)
+        search_window.title("Search Vocabulary")
+        search_window.configure(bg="#222")
+        search_window.geometry("450x200")  # Increased height to 200
+        search_window.transient(self.root)
+        
+        # Center the window
+        search_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (search_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (search_window.winfo_height() // 2)
+        search_window.geometry(f"+{x}+{y}")
+        
+        # Variables for navigation
+        self.current_match_index = 0
+        self.search_matches = []
+        self.current_search_term = ""
+        
+        # Simple layout without nested frames
+        tk.Label(search_window, text="Search for word:", bg="#222", fg="white").pack(pady=(10, 5))
+        
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(search_window, textvariable=search_var, width=40, bg="#333", fg="white")
+        search_entry.pack(pady=5)
+        search_entry.focus()
+        
+        # Navigation frame (initially hidden)
+        nav_frame = tk.Frame(search_window, bg="#222")
+        
+        # Navigation label to show current position
+        nav_label = tk.Label(nav_frame, text="", bg="#222", fg="yellow", font=("Arial", 9))
+        nav_label.pack(pady=5)
+        
+        # Navigation buttons
+        nav_btn_frame = tk.Frame(nav_frame, bg="#222")
+        nav_btn_frame.pack(pady=5)
+        
+        # Simple button frame
+        btn_frame = tk.Frame(search_window, bg="#222")
+        btn_frame.pack(pady=10)
+        
+        def jump_to_match(match_info):
+            """Jump to the specific match in the vocabulary textbox"""
+            try:
+                # match_info is a tuple: (line_number, line_text, language)
+                line_number = match_info[0]  # This is the line index (0-based)
+                match_text = match_info[1]   # This is the full line text
+                
+                # Convert 0-based line number to 1-based for tkinter
+                start_index = f"{line_number + 1}.0"
+                end_index = f"{line_number + 1}.{len(match_text)}"
+                
+                # Scroll to the match and set focus
+                self.vocabulary_textbox.focus_set()
+                self.vocabulary_textbox.tag_remove(tk.SEL, "1.0", tk.END)
+                self.vocabulary_textbox.tag_add(tk.SEL, start_index, end_index)
+                self.vocabulary_textbox.mark_set(tk.INSERT, start_index)
+                self.vocabulary_textbox.see(start_index)
+                
+            except Exception as e:
+                print(f"Error jumping to match: {e}")
+                # Fallback: just show the beginning
+                self.vocabulary_textbox.see("1.0")
+        
+        def navigate_match(direction):
+            """Navigate to next or previous match"""
+            if direction == "next":
+                self.current_match_index = (self.current_match_index + 1) % len(self.search_matches)
+            elif direction == "prev":
+                self.current_match_index = (self.current_match_index - 1) % len(self.search_matches)
+            
+            # Update highlights and navigation label
+            self.highlight_vocabulary_matches(self.search_matches, self.current_search_term, False)
+            jump_to_match(self.search_matches[self.current_match_index])
+            nav_label.config(text=f"Match {self.current_match_index + 1} of {len(self.search_matches)}")
+        
+        # Search function
+        def perform_search():
+            search_term = search_var.get().strip()
+            if search_term:
+                vocab_text = self.vocabulary_textbox.get(1.0, tk.END)
+                matches = self.search_vocabulary(vocab_text, search_term, "both", False)
+                
+                if matches:
+                    # Store matches and reset navigation
+                    self.search_matches = matches
+                    self.current_search_term = search_term
+                    self.current_match_index = 0
+                    
+                    # Show navigation if multiple matches
+                    if len(matches) > 1:
+                        nav_frame.pack(pady=5)
+                        nav_label.config(text=f"Match 1 of {len(matches)}")
+                        # Jump to first match
+                        jump_to_match(matches[0])
+                    else:
+                        nav_frame.pack_forget()  # Hide navigation for single match
+                        jump_to_match(matches[0])
+                    
+                    self.highlight_vocabulary_matches(matches, search_term, False)
+                    messagebox.showinfo("Search Results", f"Found {len(matches)} matches")
+                else:
+                    self.search_matches = []
+                    nav_frame.pack_forget()  # Hide navigation
+                    messagebox.showinfo("Search Results", "No matches found")
+
+        def clear_highlights():
+            """Clear the search highlights from vocabulary"""
+            self.clear_vocabulary_highlights()
+            self.search_matches = []
+            nav_frame.pack_forget()  # Hide navigation
+            messagebox.showinfo("Cleared", "All highlights cleared")
+        
+        # Navigation buttons
+        ttk.Button(nav_btn_frame, text="◀ Previous", 
+                command=lambda: navigate_match("prev")).pack(side=tk.LEFT, padx=5)
+        ttk.Button(nav_btn_frame, text="Next ▶", 
+                command=lambda: navigate_match("next")).pack(side=tk.LEFT, padx=5)
+        
+        # Main buttons
+        ttk.Button(btn_frame, text="Search", command=perform_search).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Clear Highlights", command=clear_highlights).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Close", command=search_window.destroy).pack(side=tk.LEFT, padx=5)
+        
+        search_entry.bind('<Return>', lambda e: perform_search())
+
+
+    def search_vocabulary(self, vocab_text, search_term, search_type, case_sensitive):
+        """Search for terms in vocabulary text"""
+        lines = vocab_text.split('\n')
+        matches = []
+        
+        if not case_sensitive:
+            search_term = search_term.lower()
+        
+        for i, line in enumerate(lines):
+            if not line.strip() or '=' not in line:
+                continue
+                
+            try:
+                german, english = line.split('=', 1)
+                german = german.strip()
+                english = english.strip()
+                
+                if search_type in ["german", "both"]:
+                    text_to_search = german if case_sensitive else german.lower()
+                    if search_term in text_to_search:
+                        matches.append((i, line, "german"))
+                
+                if search_type in ["english", "both"]:
+                    text_to_search = english if case_sensitive else english.lower()
+                    if search_term in text_to_search:
+                        matches.append((i, line, "english"))
+                        
+            except ValueError:
+                continue
+        
+        return matches
+
+    def highlight_vocabulary_matches(self, matches, search_term, case_sensitive):
+        """Highlight search matches in the vocabulary textbox"""
+        self.clear_vocabulary_highlights()
+        
+        # Configure highlight tag
+        self.vocabulary_textbox.tag_configure("search_highlight", background="yellow", foreground="black")
+        
+        for line_num, line, language in matches:
+            # Calculate start position of the line
+            start_pos = f"{line_num + 1}.0"
+            
+            if language == "german":
+                # Highlight German part (before =)
+                if '=' in line:
+                    german_part = line.split('=', 1)[0]
+                    start_idx = line.find(search_term) if case_sensitive else line.lower().find(search_term.lower())
+                    if start_idx != -1 and start_idx < len(german_part):
+                        start = f"{line_num + 1}.{start_idx}"
+                        end = f"{line_num + 1}.{start_idx + len(search_term)}"
+                        self.vocabulary_textbox.tag_add("search_highlight", start, end)
+            else:
+                # Highlight English part (after =)
+                if '=' in line:
+                    parts = line.split('=', 1)
+                    if len(parts) > 1:
+                        english_part = parts[1]
+                        start_idx = line.find(search_term) if case_sensitive else line.lower().find(search_term.lower())
+                        if start_idx != -1 and start_idx >= len(parts[0]):
+                            # Adjust for the = sign
+                            adjusted_start = start_idx
+                            start = f"{line_num + 1}.{adjusted_start}"
+                            end = f"{line_num + 1}.{adjusted_start + len(search_term)}"
+                            self.vocabulary_textbox.tag_add("search_highlight", start, end)
+        
+        # Scroll to first match
+        if matches:
+            first_line = matches[0][0] + 1
+            self.vocabulary_textbox.see(f"{first_line}.0")
+
+    def clear_vocabulary_highlights(self):
+        """Clear all search highlights"""
+        self.vocabulary_textbox.tag_remove("search_highlight", "1.0", tk.END)
+
+
     def create_middle_section(self):
         middle_frame = tk.Frame(self.root, bg="#222")
         middle_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=12)
@@ -1409,7 +1629,9 @@ class VocabularyApp:
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="Sort-Remove\nDuplicates", style='SmallGoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2) # Adjusted from 17, as group padding will handle overall spacing
-
+    # Search button
+        ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
+                command=self.show_vocabulary_search).pack(side=tk.RIGHT, padx=(0, 5))
 
     # --- Group 2: Study Text Buttons ---
     # Create a frame for the Study Text buttons
