@@ -2093,24 +2093,64 @@ class VocabularyApp:
         self.current_voc_file = None
         self.vocabulary_textbox.delete(1.0, tk.END)
 
+
     def load_study_text(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 
         if filename.endswith("_TXT.txt") or "_TXT.txt" in filename:
-            self.current_study_file = filename  # Save the loaded filename
+            self.current_study_file = filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
-                self.study_textbox.insert(tk.END, content)
+                
+                # Extract title
+                title = self.extract_title_from_text(content)
+                
+                # Update the label - search more broadly
+                self.update_study_textbox_label(title)
+                
+                # Remove title line and insert cleaned content
+                cleaned_content = self.remove_title_line(content)
+                self.study_textbox.delete(1.0, tk.END)
+                self.study_textbox.insert(tk.END, cleaned_content)
         
         else:
             messagebox.showwarning(
-            "Invalid File Type",
-            "The selected file is not a vocabulary file.\n\n"
-            "Please select a file that ends with '_TXT.txt'.\n\n"
-        )
+                "Invalid File Type",
+                "The selected file is not a Study Text file.\n\n"
+                "Please select a file that ends with '_TXT.txt'.\n\n"
+            )
             return
+    
+    def update_study_textbox_label(self, title):
+        """Find and update the study text box label"""
+        # Search through all widgets to find the study text label
+        def search_widgets(widget):
+            if isinstance(widget, tk.Label) and "Study Text Box" in widget.cget('text'):
+                widget.config(text=f"Study Text Box: {title}")
+                return True
+            # Recursively search children
+            for child in widget.winfo_children():
+                if search_widgets(child):
+                    return True
+            return False
+        
+        # Start search from root
+        search_widgets(self.root)
+        
+    def extract_title_from_text(self, text_content):
+        """Extract title from first line if it starts with 'Title:' or 'URL:'"""
+        lines = text_content.split('\n')
+        if lines and (lines[0].startswith('Title:') or lines[0].startswith('URL:')):
+            return lines[0].split(':', 1)[1].strip()
+        return 'Title?'
 
-
+    def remove_title_line(self, text_content):
+        """Remove the first line if it contains Title: or URL:"""
+        lines = text_content.split('\n')
+        if lines and (lines[0].startswith('Title:') or lines[0].startswith('URL:')):
+            return '\n'.join(lines[1:])  # Return text without first line
+        return text_content  # Return original text if no title line found
+        
     def clear_study_text(self):
         self.current_study_file = None
         self.study_textbox.delete(1.0, tk.END)
