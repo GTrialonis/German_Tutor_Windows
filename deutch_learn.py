@@ -565,6 +565,34 @@ class VocabularyApp:
         # Evaluate and mark as evaluated
         self.evaluate_answer(user_answer)
         self.evaluated_questions.add(current_q_index)
+        
+        # Check if this was the last question
+        if len(self.evaluated_questions) >= len(self.current_questions):
+            # Last question evaluated - end session
+            self.end_listening_comprehension_session()
+    
+
+    def end_listening_comprehension_session(self):
+        """End the listening comprehension session and reset button states"""
+        # Reset button states
+        if hasattr(self, 'eval_answer_btn'):
+            self.eval_answer_btn.config(state="disabled")
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state="normal")
+        
+        # Clear session data
+        self.current_questions = []
+        self.evaluated_questions = set()
+        self.current_question_index = 0
+        
+        # Close any open popup windows
+        try:
+            if hasattr(self, 'listening_window') and self.listening_window:
+                self.listening_window.destroy()
+        except:
+            pass
+        
+        messagebox.showinfo("Session Complete", "All questions have been evaluated. Listening comprehension session ended.")
     
 
     def toggle_reading(self, text_content, play_button, pause_button, status_label, progress_var, voice):
@@ -1381,12 +1409,14 @@ class VocabularyApp:
         )
         self.prompt_ai_button.pack(side='left', padx=(10, 3), pady=3)
 
-        ttk.Button(
+        self.eval_answer_btn = ttk.Button(
             left_frame,
             text="Eval.Answer",
             style='SmallGoldYellow.TButton',
-            command=self.handle_listening_answer
-        ).pack(side='left', padx=(10, 3), pady=3)
+            command=self.handle_listening_answer,
+            state="disabled"  # Initially disabled
+        )
+        self.eval_answer_btn.pack(side='left', padx=(10, 3), pady=3)
 
         ttk.Button(
             left_frame,
@@ -2597,6 +2627,15 @@ class VocabularyApp:
             rb = tk.Radiobutton(voice_frame, text=name, variable=voice_var, value=value,
                             bg="#222", fg="white", selectcolor="#444")
             rb.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Set button states for the entire listening session
+        if hasattr(self, 'eval_answer_btn'):
+            self.eval_answer_btn.config(state="normal")
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state="disabled")
+        
+        # Reset evaluation tracking for new session
+        self.evaluated_questions = set()
         
         # Create buttons - use a different approach to get the voice value
         ttk.Button(frame, text="Load German Text File", 
@@ -3436,25 +3475,28 @@ class VocabularyApp:
             current_question = self.current_questions[self.current_question_index]
             
             prompt = f"""
-                Bewerte die folgende Antwort auf die Frage. Die Antwort sollte inhaltlich korrekt, grammatikalisch richtig und in vollständigen Sätzen auf Deutsch sein.
+                Evaluate the following response to the question. The answer should be factually correct, grammatically accurate, \
+                    and in complete sentences in German.
 
                 FRAGE: {current_question}
                 ANTWORD DES LERNENDEN: {user_answer}
 
-                Bewertungskriterien:
-                1. Inhaltliche Richtigkeit (0-2 Punkte)
-                2. Sprachliche Angemessenheit und Vollständigkeit (0-1 Punkt) 
-                3. Grammatik und Syntax (0-1 Punkt)
-                4. Wortschatz und Ausdruck (0-1 Punkt)
+                Evaluation criteria:
+                1. Factual accuracy (0-2 points)
+                2. Linguistic appropriateness and completeness (0-1 point) 
+                3. Grammar and syntax (0-1 point)
+                4. Vocabulary and expression (0-1 point)
 
-                Maximalpunktzahl: 5 Punkte pro Frage.
+                Maximum score: 5 points per question.
 
-                WENN die Antwort grammatikalische oder syntaktische Fehler enthält, biete eine korrigierte Version an.
+                IF the answer contains grammatical or syntactical errors, you MUST return a corrected version. Only if the \
+                    user's answer is grammatically and syntactically correct should you leave KORREKTUR empty.
 
-                Gib deine Bewertung in diesem Format zurück:
-                PUNKTE: [Anzahl der Punkte]/5
-                KOMMENTAR: [Dein konstruktives Feedback auf Deutsch]
-                KORREKTUR: [Falls nötig, eine grammatikalisch korrekte Alternative, sonst leer lassen]
+                Return your evaluation in this format:
+                PUNKTE: [Score]/5
+                KOMMENTAR: [Your constructive feedback in German]
+                KORREKTUR: [Provide a grammatically corrected version of the user's answer if errors were present, \
+                    otherwise leave empty]
                 """
             
             response = self.client.chat.completions.create(
