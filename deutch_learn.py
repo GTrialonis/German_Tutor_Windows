@@ -266,13 +266,13 @@ class VocabularyApp:
         )
         return resp.choices[0].message.content.strip()
     
-    # ------------- LISTENING ----------
+    # ------------- LISTENING ONLY ----------
     def create_listen_functionality(self):
-        """Create the popup window for listening options with voice selection"""
+        """Create popup for text-to-speech only (no comprehension questions)"""
         listen_window = tk.Toplevel(self.root)
         listen_window.title("Listen to Text")
         listen_window.configure(bg="#222")
-        listen_window.geometry("350x250")  # Increased height for voice selection
+        listen_window.geometry("400x300")
         listen_window.transient(self.root)
         listen_window.grab_set()
         
@@ -282,38 +282,91 @@ class VocabularyApp:
         y = (self.root.winfo_screenheight() // 2) - (listen_window.winfo_height() // 2)
         listen_window.geometry(f"+{x}+{y}")
         
-        # Create buttons
-        frame = tk.Frame(listen_window, bg="#222")
-        frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
-        
         # Voice selection
-        voice_label = tk.Label(frame, text="Select Voice:", bg="#222", fg="white")
-        voice_label.pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(listen_window, text="Select Voice:", bg="#222", fg="white", font=("Arial", 12, "bold")).pack(pady=(15, 8))
         
-        voice_var = tk.StringVar(value="alloy")  # Default voice
+        voice_var = tk.StringVar(value="alloy")
+        voices_frame = tk.Frame(listen_window, bg="#222")
+        voices_frame.pack(pady=8)
         
-        voice_frame = tk.Frame(frame, bg="#222")
-        voice_frame.pack(fill=tk.X, pady=(0, 15))
+        voice_colors = {
+            "alloy": "#4A90E2",    # Blue
+            "echo": "#50E3C2",     # Teal
+            "fable": "#B8E986",    # Green
+            "onyx": "#BD10E0",     # Purple
+            "nova": "#F5A623"      # Orange
+        }
         
-        voices = [("Alloy", "alloy"), ("Echo", "echo"), ("Fable", "fable"), 
-                ("Onyx", "onyx"), ("Nova", "nova"), ("Shimmer", "shimmer")]
+        for voice in ["alloy", "echo", "fable", "onyx", "nova"]:
+            tk.Radiobutton(voices_frame, text=voice.capitalize(), variable=voice_var, 
+                        value=voice, bg="#222", fg="white", selectcolor=voice_colors[voice],
+                        font=("Arial", 10)).pack(side=tk.LEFT, padx=8)
         
-        for i, (name, value) in enumerate(voices):
-            rb = tk.Radiobutton(voice_frame, text=name, variable=voice_var, value=value,
-                            bg="#222", fg="white", selectcolor="#444")
-            rb.pack(side=tk.LEFT, padx=(0, 10))
+        # Button frame
+        btn_frame = tk.Frame(listen_window, bg="#222")
+        btn_frame.pack(pady=25)
         
-        ttk.Button(frame, text="Load _TXT.txt file", 
-                style='SmallBlue.TButton',
-                command=lambda: self.start_reading_from_file(listen_window, voice_var.get())).pack(pady=5, fill=tk.X)
+        # Track if speech is playing
+        self.speech_playing = False
         
-        ttk.Button(frame, text="Read from Study Text Box", 
-                style='SmallGreen.TButton',
-                command=lambda: self.start_reading_from_textbox(listen_window, voice_var.get())).pack(pady=5, fill=tk.X)
+        def listen_from_file():
+            if not self.speech_playing:
+                filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+                if filename:
+                    try:
+                        with open(filename, 'r', encoding='utf-8') as file:
+                            text = file.read()
+                            self.speech_playing = True
+                            listen_window.attributes('-disabled', True)  # Disable window during speech
+                            self.speak_text(text, voice_var.get(), listen_window)
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to read file: {str(e)}")
         
-        ttk.Button(frame, text="Cancel", 
-                style='SmallRed.TButton',
-                command=listen_window.destroy).pack(pady=5, fill=tk.X)
+        def listen_from_study_box():
+            if not self.speech_playing:
+                text = self.study_textbox.get(1.0, tk.END).strip()
+                if text:
+                    self.speech_playing = True
+                    listen_window.attributes('-disabled', True)
+                    self.speak_text(text, voice_var.get(), listen_window)
+                else:
+                    messagebox.showwarning("No Text", "Study Text Box is empty.")
+        
+        def listen_from_clipboard():
+            if not self.speech_playing:
+                try:
+                    text = self.root.clipboard_get()
+                    if text.strip():
+                        self.speech_playing = True
+                        listen_window.attributes('-disabled', True)
+                        self.speak_text(text, voice_var.get(), listen_window)
+                    else:
+                        messagebox.showwarning("Empty Clipboard", "Clipboard is empty or contains no text.")
+                except:
+                    messagebox.showwarning("Clipboard Error", "Cannot access clipboard or no text available.")
+        
+        def cancel_listen():
+            if not self.speech_playing:
+                listen_window.destroy()
+        
+        # Colorful buttons with styles
+        ttk.Button(btn_frame, text="📁 Load TXT File", style='SmallBlue.TButton', 
+                command=listen_from_file).pack(pady=6, fill=tk.X)
+        ttk.Button(btn_frame, text="📖 Read from Study Text Box", style='SmallGreen.TButton', 
+                command=listen_from_study_box).pack(pady=6, fill=tk.X)
+        ttk.Button(btn_frame, text="📋 Read from Clipboard", style='SmallPurple.TButton', 
+                command=listen_from_clipboard).pack(pady=6, fill=tk.X)
+        ttk.Button(btn_frame, text="❌ Cancel", style='SmallRed.TButton', 
+                command=cancel_listen).pack(pady=10, fill=tk.X)
+        
+        # Handle window close (X button)
+        def on_closing():
+            if not self.speech_playing:
+                listen_window.destroy()
+            else:
+                messagebox.showinfo("Speech Playing", "Please wait for speech to finish.")
+        
+        listen_window.protocol("WM_DELETE_WINDOW", on_closing)
 
     def create_listening_comprehension(self):
         """Create the listening comprehension popup window with voice selection"""
@@ -2673,22 +2726,62 @@ class VocabularyApp:
             self.eval_answer_btn.config(state="normal")
         if hasattr(self, 'prompt_ai_button'):
             self.prompt_ai_button.config(state="disabled")
+
+        # ------------- NEW CODE FROM HERE ------
+        # ------------- CORRECTED CODE FROM HERE ------
+        tk.Label(frame, text="Select a text file for listening comprehension:", 
+            bg="#222", fg="white").pack(pady=20)
+
+        btn_frame = tk.Frame(frame, bg="#222")
+        btn_frame.pack(pady=20)
+
+        def on_cancel():
+            """Re-enable Prompt AI button and close window"""
+            if hasattr(self, 'prompt_ai_button'):
+                self.prompt_ai_button.config(state="normal")
+            listen_comp_window.destroy()  # Fixed variable name
         
+        def on_file_select():
+            # Only proceed if user actually selects a file
+            filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+            if filename:
+                # Process the file and start listening comprehension
+                # Call your existing function that processes the file
+                self.start_listening_from_file(listen_comp_window, voice_var.get(), filename)
+            else:
+                # If user cancels file selection, re-enable Prompt AI button
+                if hasattr(self, 'prompt_ai_button'):
+                    self.prompt_ai_button.config(state="normal")
+                listen_comp_window.destroy()
+
+        ttk.Button(btn_frame, text="Select Text File", 
+                command=on_file_select).pack(side=tk.LEFT, padx=10)
+        ttk.Button(btn_frame, text="Cancel", 
+                command=on_cancel).pack(side=tk.LEFT, padx=10)
+        
+        # Also handle window close (X button)
+        def on_window_close():
+            if hasattr(self, 'prompt_ai_button'):
+                self.prompt_ai_button.config(state="normal")
+            listen_comp_window.destroy()  # Fixed variable name
+        
+        listen_comp_window.protocol("WM_DELETE_WINDOW", on_window_close)  # Fixed variable name
+            
         # Reset evaluation tracking for new session
         self.evaluated_questions = set()
         
         # Create buttons - use a different approach to get the voice value
-        ttk.Button(frame, text="Load German Text File", 
-                style='SmallBlue.TButton',
-                command=lambda: self.start_listening_from_file(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
+        # ttk.Button(frame, text="Load German Text File", 
+        #         style='SmallBlue.TButton',
+        #         command=lambda: self.start_listening_from_file(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
         
-        ttk.Button(frame, text="Search Internet for German Text", 
-                style='SmallGreen.TButton',
-                command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
+        # ttk.Button(frame, text="Search Internet for German Text", 
+        #         style='SmallGreen.TButton',
+        #         command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
         
-        ttk.Button(frame, text="Cancel", 
-                style='SmallRed.TButton',
-                command=listen_comp_window.destroy).pack(pady=5, fill=tk.X)
+        # ttk.Button(frame, text="Cancel", 
+        #         style='SmallRed.TButton',
+        #         command=listen_comp_window.destroy).pack(pady=5, fill=tk.X)
     
 
     def use_study_text_for_comprehension(self, parent_window):
@@ -3305,9 +3398,12 @@ class VocabularyApp:
                 daemon=True
             ).start()
 
-    def speak_text(self, text, voice="alloy"):
+    def speak_text(self, text, voice="alloy", window=None):
         """Speak text using TTS - simplified version for questions and general use"""
         try:
+            # Set speech playing flag
+            self.speech_playing = True
+            
             # Ensure pygame mixer is initialized
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
@@ -3338,15 +3434,37 @@ class VocabularyApp:
             pygame.mixer.music.load(audio_file)
             pygame.mixer.music.play()
             
-            # Wait for playback to finish
-            while pygame.mixer.music.get_busy():
-                pygame.time.wait(100)
+            # Wait for playback to finish in a non-blocking way
+            def wait_for_playback():
+                while pygame.mixer.music.get_busy():
+                    pygame.time.wait(100)
+                
+                # Clean up with safe method
+                self.safe_cleanup_audio_file(audio_file)
+                
+                # Reset speech playing flag and re-enable window
+                self.speech_playing = False
+                if window and window.winfo_exists():
+                    window.attributes('-disabled', False)
+                    # Show completion message if window still exists
+                    try:
+                        messagebox.showinfo("Playback Complete", "Text reading finished.")
+                    except:
+                        pass  # Window might be closed
             
-            # Clean up with safe method
-            self.safe_cleanup_audio_file(audio_file)
+            # Use threading to avoid blocking the GUI
+            import threading
+            playback_thread = threading.Thread(target=wait_for_playback)
+            playback_thread.daemon = True
+            playback_thread.start()
                 
         except Exception as e:
             print(f"TTS error: {e}")
+            # Reset speech playing flag and re-enable window on error
+            self.speech_playing = False
+            if window and window.winfo_exists():
+                window.attributes('-disabled', False)
+            messagebox.showerror("TTS Error", f"Failed to generate speech: {str(e)}")
 
     def safe_delete_file(self, filepath):
         """Safely delete a file with retries and error handling"""
