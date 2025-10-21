@@ -2021,6 +2021,27 @@ class VocabularyApp:
         return "break"  # Prevent default behavior
 
 # -------------------- END OF HIGHLIGHTING --------------
+# ------------- Added extra blocks of code to automate _TXT and _TRA loading ---
+    # def load_vocabulary(self):
+    #     filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+
+    #     if filename.endswith("_VOC.txt") or "_VOC.txt" in filename:
+    #         self.current_voc_file = filename  # Save the loaded filename
+    #         with open(filename, 'r', encoding='utf-8-sig') as file:
+    #             content = file.read()
+    #             self.vocabulary_textbox.delete(1.0, tk.END)  # Clear before inserting
+    #             self.vocabulary_textbox.insert(tk.END, content)
+    #             self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
+    #             self.load_current_voc += 1
+    #             self.load_test_file()
+    #     else:
+    #         messagebox.showwarning(
+    #         "Invalid File Type",
+    #         "The selected file is not a vocabulary file.\n\n"
+    #         "Please select a file that ends with '_VOC.txt'.\n\n"
+    #     )
+    #         return
+# ------------------ These are the extra blocks of code -------------
     def load_vocabulary(self):
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 
@@ -2033,16 +2054,110 @@ class VocabularyApp:
                 self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
                 self.load_current_voc += 1
                 self.load_test_file()
+            
+            # Ask user if they want to load related files
+            response = messagebox.askyesno(
+                "Load Related Files", 
+                "Do you want to also load the corresponding Study Text and Translation files?"
+            )
+            
+            if response:
+                # Extract base filename (everything before _VOC.txt)
+                base_name = filename.replace("_VOC.txt", "")
+                
+                # Construct related filenames
+                study_text_file = base_name + "_TXT.txt"
+                translation_file = base_name + "_TRA.txt"
+                
+                # Load Study Text file if it exists
+                if os.path.exists(study_text_file):
+                    try:
+                        with open(study_text_file, 'r', encoding='utf-8-sig') as file:
+                            content = file.read()
+                            
+                            # Extract and display title in label
+                            title = self.extract_title_from_text(content)
+                            # Update the study text label
+                            self.update_study_text_label(title)
+                            
+                            # Remove title line and insert cleaned content
+                            cleaned_content = self.remove_title_line(content)
+                            self.study_textbox.delete(1.0, tk.END)
+                            self.study_textbox.insert(tk.END, cleaned_content)
+                            
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to load study text: {str(e)}")
+                else:
+                    messagebox.showinfo("File Not Found", f"Study text file not found:\n{study_text_file}")
+                
+                # Load Translation file if it exists
+                if os.path.exists(translation_file):
+                    try:
+                        with open(translation_file, 'r', encoding='utf-8-sig') as file:
+                            content = file.read()
+                            
+                            # Extract and display title in label
+                            title = self.extract_title_from_text(content)
+                            # Update the translation label
+                            self.update_translation_label(title)
+                            
+                            # Remove title line and insert cleaned content
+                            cleaned_content = self.remove_title_line(content)
+                            self.translation_textbox.delete(1.0, tk.END)
+                            self.translation_textbox.insert(tk.END, cleaned_content)
+                            
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to load translation: {str(e)}")
+                else:
+                    messagebox.showinfo("File Not Found", f"Translation file not found:\n{translation_file}")
+        
         else:
             messagebox.showwarning(
-            "Invalid File Type",
-            "The selected file is not a vocabulary file.\n\n"
-            "Please select a file that ends with '_VOC.txt'.\n\n"
-        )
+                "Invalid File Type",
+                "The selected file is not a vocabulary file.\n\n"
+                "Please select a file that ends with '_VOC.txt'.\n\n"
+            )
             return
+# -------------------- Helper Functions to the above ----------
+    def update_study_text_label(self, title):
+        """Find and update the study text box label"""
+        def search_widgets(widget):
+            if isinstance(widget, tk.Label) and "Study Text Box" in widget.cget('text'):
+                widget.config(text=f"Study Text Box: {title}")
+                return True
+            for child in widget.winfo_children():
+                if search_widgets(child):
+                    return True
+            return False
+        search_widgets(self.root)
 
+    def update_translation_label(self, title):
+        """Find and update the translation box label"""
+        def search_widgets(widget):
+            if isinstance(widget, tk.Label) and "Translation Box" in widget.cget('text'):
+                widget.config(text=f"Translation Box: {title}")
+                return True
+            for child in widget.winfo_children():
+                if search_widgets(child):
+                    return True
+            return False
+        search_widgets(self.root)
 
-    # -------------- REPEAT CHANGES IN OTHER TWO TEXTBOX SAVES ----
+    def extract_title_from_text(self, text_content):
+        """Extract title from first line if it starts with 'Title:' or 'URL:'"""
+        lines = text_content.split('\n')
+        if lines and (lines[0].startswith('Title:') or lines[0].startswith('URL:')):
+            return lines[0].split(':', 1)[1].strip()
+        return 'Title?'
+
+    def remove_title_line(self, text_content):
+        """Remove the first line if it contains Title: or URL:"""
+        lines = text_content.split('\n')
+        if lines and (lines[0].startswith('Title:') or lines[0].startswith('URL:')):
+            return '\n'.join(lines[1:])
+        return text_content
+#     
+# -------------- REPEAT CHANGES IN OTHER TWO TEXTBOX SAVES ----
     def save_vocabulary(self):
         if not self.current_voc_file:  # If no file was loaded, ask where to save
             filename = filedialog.asksaveasfilename(
