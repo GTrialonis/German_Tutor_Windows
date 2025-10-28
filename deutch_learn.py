@@ -48,7 +48,6 @@ def configure_openai():
         messagebox.showerror("API Configuration Error", f"Failed to configure OpenAI API: {e}")
         exit()
 
-
 class VocabularyApp:
     def __init__(self, root):
         self.root = root
@@ -78,7 +77,7 @@ class VocabularyApp:
         self.current_example_sentences_file = None
         self.current_ai_responses_file = None
         self.score = 0  # Initialize score
-        self.count_test_num = 0 # debug. Initialize test number question
+        self.count_test_num = 0 # nitialize test number question
         self.total_questions = 0  # Total number of questions asked
         self.correct_answers = 0  # Number of correct answers
         self.flip_mode = False  # Tracks whether flip mode is active
@@ -92,7 +91,6 @@ class VocabularyApp:
         self.current_voice = "nova"  # Default voice (sounds good for German)
 
         # --------- LISTENING COMPREHENSION ---------
-        # Add these variables for listening comprehension
         # Add these variables for listening comprehension
         self.listening_comprehension_text = ""
         self.current_questions = []
@@ -1086,7 +1084,7 @@ class VocabularyApp:
     # --------------------
     # AI creates vocabulary from txt file
     # --------------------
-    def create_vocabulary(self): # debug
+    def create_vocabulary(self):
         """AI creates vocabulary from txt file with content warning"""
         # Use the warning check before proceeding
         self.check_content_and_warn(self._create_vocabulary_impl)
@@ -1784,7 +1782,7 @@ class VocabularyApp:
         btn_frame2.pack(fill=tk.X)
         ttk.Button(btn_frame2, text="Choose '_VOC.txt' File", style='SmallBlue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Flip Words", style='SmallGoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame2, text="Clear Test", style='SmallOrange.TButton', command=self.find_wrong_read_text_calls).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Clear Test", style='SmallOrange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
     
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
@@ -1811,8 +1809,8 @@ class VocabularyApp:
         self.score_label = tk.Label(answer_frame, text="0%", fg="white", bg="#222")
         self.score_label.pack(side=tk.LEFT)
         tk.Label(answer_frame, text="Test Question Number", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
-        self.count_test_num_label = tk.Label(answer_frame, text="0", fg="white", bg="#222") # debug
-        self.count_test_num_label.pack(side=tk.LEFT) # debug
+        self.count_test_num_label = tk.Label(answer_frame, text="0", fg="white", bg="#222")
+        self.count_test_num_label.pack(side=tk.LEFT)
 
         # Dictionary Search
         tk.Label(right_frame, text="Search word using AI or Langenscheid online dictionary", fg="gold", bg="#222").pack(anchor='w', pady=5)
@@ -2049,7 +2047,7 @@ class VocabularyApp:
             self.current_voc_file = filename  # Save the loaded filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
-                self.vocabulary_textbox.delete(1.0, tk.END)  # Clear before inserting
+                self.vocabulary_textbox.delete(1.0, tk.END)
                 self.vocabulary_textbox.insert(tk.END, content)
                 self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
                 self.load_current_voc += 1
@@ -2075,9 +2073,11 @@ class VocabularyApp:
                         with open(study_text_file, 'r', encoding='utf-8-sig') as file:
                             content = file.read()
                             
+                            # Store the filename for saving later
+                            self.current_study_file = study_text_file
+                            
                             # Extract and display title in label
                             title = self.extract_title_from_text(content)
-                            # Update the study text label
                             self.update_study_text_label(title)
                             
                             # Remove title line and insert cleaned content
@@ -2096,9 +2096,11 @@ class VocabularyApp:
                         with open(translation_file, 'r', encoding='utf-8-sig') as file:
                             content = file.read()
                             
+                            # Store the filename for saving later
+                            self.current_translation_file = translation_file
+                            
                             # Extract and display title in label
                             title = self.extract_title_from_text(content)
-                            # Update the translation label
                             self.update_translation_label(title)
                             
                             # Remove title line and insert cleaned content
@@ -2187,6 +2189,7 @@ class VocabularyApp:
                 defaultextension=".txt",
                 filetypes=[("Text files", "*.txt")]
             )
+
             if filename:
                 nwext = os.path.splitext(filename)[0] # nwext = name without extension (here '_TXT)
                 if '_TXT' not in filename:
@@ -2203,25 +2206,32 @@ class VocabularyApp:
             messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
 
     def save_translation(self):
-        if not self.current_translated_file:  # If no file was loaded, ask where to save
+        """Save translation back to the original file if known, otherwise use filedialog"""
+        if hasattr(self, 'current_translation_file') and self.current_translation_file:
+            # Save to the known file
+            try:
+                content = self.translation_textbox.get(1.0, tk.END).strip()
+                with open(self.current_translation_file, 'w', encoding='utf-8') as file:
+                    file.write(content)
+                messagebox.showinfo("Saved", f"Translation saved to:\n{self.current_translation_file}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+        else:
+            # Fall back to filedialog if no known file
             filename = filedialog.asksaveasfilename(
                 defaultextension=".txt",
-                filetypes=[("Text files", "*.txt")]
+                filetypes=[("Text files", "*.txt")],
+                initialfile="translation.txt"
             )
             if filename:
-                nwext = os.path.splitext(filename)[0] # nwext = name without extension (here '_TRA)
-                if '_TRA' not in filename:
-                    filename = nwext + '_TRA.txt'
-                self.current_translated_file = filename  # Update current file for future saves
-        else:
-            filename = self.current_translated_file  # Use the stored filename
-
-        if filename:
-            with open(filename, 'w', encoding='utf-8-sig') as file:
-                content = self.translation_textbox.get(1.0, tk.END)
-                file.write(content)
-            # Show success message with file path
-            messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
+                try:
+                    content = self.translation_textbox.get(1.0, tk.END).strip()
+                    with open(filename, 'w', encoding='utf-8') as file:
+                        file.write(content)
+                    self.current_translation_file = filename
+                    messagebox.showinfo("Saved", f"Translation saved to:\n{filename}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
 
     def sort_vocabulary(self):
         # Get content from the textbox
@@ -2412,29 +2422,37 @@ class VocabularyApp:
             return
 
 
-    def find_wrong_read_text_calls(self):
-        """Temporary function to find where read_text is called with wrong arguments"""
-        try:
-            with open(__file__, 'r', encoding='utf-8-sig') as f:
-                content = f.read()
+    def clear_test(self):
+        self.vocabulary = []
+        self.score_label.config(text="0%")
+        self.score = 0
+        self.total_questions = 0  # Total number of questions asked
+        self.correct_answers = 0  # Number of correct answers
+        self.test_filename_label.config(text="File is: ") # debug
+        self.test_textbox.delete(1.0, tk.END)
+
+        # """Temporary function to find where read_text is called with wrong arguments"""
+        # try:
+        #     with open(__file__, 'r', encoding='utf-8-sig') as f:
+        #         content = f.read()
             
-            # Look for read_text calls
-            lines = content.split('\n')
-            found_calls = []
-            for i, line in enumerate(lines, 1):
-                if 'read_text' in line and ('self.read_text' in line or 'target=self.read_text' in line):
-                    found_calls.append((i, line.strip()))
+        #     # Look for read_text calls
+        #     lines = content.split('\n')
+        #     found_calls = []
+        #     for i, line in enumerate(lines, 1):
+        #         if 'read_text' in line and ('self.read_text' in line or 'target=self.read_text' in line):
+        #             found_calls.append((i, line.strip()))
             
-            print("=== ALL READ_TEXT CALLS ===")
-            for line_num, line_text in found_calls:
-                print(f"Line {line_num}: {line_text}")
-            print("=== END ===")
+        #     print("=== ALL READ_TEXT CALLS ===")
+        #     for line_num, line_text in found_calls:
+        #         print(f"Line {line_num}: {line_text}")
+        #     print("=== END ===")
             
-            return found_calls
+        #     return found_calls
             
-        except Exception as e:
-            print(f"Error reading file: {e}")
-            return []
+        # except Exception as e:
+        #     print(f"Error reading file: {e}")
+        #     return []
 
     def clear_translation(self):
         self.current_translated_file = None
@@ -2650,7 +2668,7 @@ class VocabularyApp:
         if self.load_current_voc > 0:
             filename = self.current_voc_file
         else:
-            self.count_test_num = 0 # debug
+            self.count_test_num = 0 
             # in the two lines below and elsewehere I replaced 'filename' with 'self.testfile'
             filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         if filename:
@@ -2721,7 +2739,7 @@ class VocabularyApp:
         self.score = 0
         self.total_questions = 0  # Total number of questions asked
         self.correct_answers = 0  # Number of correct answers
-        self.test_filename_label.config(text="File is: ") # debug
+        self.test_filename_label.config(text="File is: ")
         self.test_textbox.delete(1.0, tk.END)
 
     def check_answer(self, event=None):
@@ -3865,7 +3883,7 @@ class NotesEditor:
         self.window = tk.Toplevel(parent)
         self.window.title("Notes Editor")
         self.window.geometry("500x400")
-        self.current_notes_file = None # debug
+        self.current_notes_file = None
 
         # Text area
         self.text = scrolledtext.ScrolledText(self.window, wrap=tk.WORD, width=60, height=20)
