@@ -222,6 +222,11 @@ class VocabularyApp:
                     background='#5D6D7E',
                     foreground='white',
                     font=self.small_button_font)
+        
+        self.style.configure('SmallGoldenSummer.TButton',
+                    background='#d4a373',
+                    foreground='black',
+                    font=self.small_button_font)
 
         # Left Section - Vocabulary, Study Text, and Translation Boxes
         self.create_left_section()
@@ -1503,7 +1508,7 @@ class VocabularyApp:
         search_window.update_idletasks()
         x = (self.root.winfo_screenwidth() // 2) - (search_window.winfo_width() // 2)
         y = (self.root.winfo_screenheight() // 2) - (search_window.winfo_height() // 2)
-        search_window.geometry(f"+{x}+{y}")
+        search_window.geometry(f"+{x+400}+{y-300}") # debug
         
         # Variables for navigation
         self.current_match_index = 0
@@ -1898,6 +1903,13 @@ class VocabularyApp:
                 style='SmallBlueish.TButton',
                 command=lambda: self.clear_text_highlight(textbox)
             ).pack(side='left', padx=3, pady=3)
+
+            ttk.Button( # debug (entire block of code below)
+                button_frame,
+                text="🔍 Search Text",
+                style='SmallGoldenSummer.TButton',
+                command=self.search_text
+            ).pack(side='left', padx=3, pady=3)
             
             # Add the "Load Text and Answer Questions" button only for Study Text Box
             if label_text == "Study Text Box:":
@@ -1906,7 +1918,7 @@ class VocabularyApp:
                     text="READING Comprehension",
                     style='SmallPurple.TButton',
                     command=self.generate_comprehension_questions
-                ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
+                ).pack(side='left', padx=(15, 3), pady=3)  # Added 20px left padding to position it to the right
             
             if label_text == "Study Text Box:":
                 ttk.Button(
@@ -1914,7 +1926,7 @@ class VocabularyApp:
                     text="LISTENING Comprehension",
                     style='SmallGoldYellow.TButton',
                     command=self.create_listening_comprehension
-                ).pack(side='left', padx=(20, 3), pady=3)  # Added 20px left padding to position it to the right
+                ).pack(side='left', padx=(15, 3), pady=3)  # Added 20px left padding to position it to the right
         
         return textbox
     
@@ -1995,6 +2007,10 @@ class VocabularyApp:
     def clear_text_highlight(self, textbox):
         """Clear highlight from the given textbox"""
         textbox.tag_remove("highlight", "1.0", tk.END)
+
+    def search_text(self):
+        pass
+
     
     def highlight_selection(self, event=None):
         """Highlight selected text in the focused textbox (keyboard shortcut)"""
@@ -2431,28 +2447,6 @@ class VocabularyApp:
         self.test_filename_label.config(text="File is: ") # debug
         self.test_textbox.delete(1.0, tk.END)
 
-        # """Temporary function to find where read_text is called with wrong arguments"""
-        # try:
-        #     with open(__file__, 'r', encoding='utf-8-sig') as f:
-        #         content = f.read()
-            
-        #     # Look for read_text calls
-        #     lines = content.split('\n')
-        #     found_calls = []
-        #     for i, line in enumerate(lines, 1):
-        #         if 'read_text' in line and ('self.read_text' in line or 'target=self.read_text' in line):
-        #             found_calls.append((i, line.strip()))
-            
-        #     print("=== ALL READ_TEXT CALLS ===")
-        #     for line_num, line_text in found_calls:
-        #         print(f"Line {line_num}: {line_text}")
-        #     print("=== END ===")
-            
-        #     return found_calls
-            
-        # except Exception as e:
-        #     print(f"Error reading file: {e}")
-        #     return []
 
     def clear_translation(self):
         self.current_translated_file = None
@@ -2902,19 +2896,6 @@ class VocabularyApp:
             
         # Reset evaluation tracking for new session
         self.evaluated_questions = set()
-        
-        # Create buttons - use a different approach to get the voice value
-        # ttk.Button(frame, text="Load German Text File", 
-        #         style='SmallBlue.TButton',
-        #         command=lambda: self.start_listening_from_file(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
-        
-        # ttk.Button(frame, text="Search Internet for German Text", 
-        #         style='SmallGreen.TButton',
-        #         command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
-        
-        # ttk.Button(frame, text="Cancel", 
-        #         style='SmallRed.TButton',
-        #         command=listen_comp_window.destroy).pack(pady=5, fill=tk.X)
     
 
     def use_study_text_for_comprehension(self, parent_window):
@@ -3067,10 +3048,6 @@ class VocabularyApp:
 
             self.current_voice = voice  # Store the selected voice
             parent_window.destroy()
-            # self.generate_listening_questions()
-
-            # self.current_voice = voice  # Store the selected voice
-            # parent_window.destroy()
             
             # SHOW READING POPUP FIRST instead of directly generating questions
             self.show_listening_text_reading_controls()
@@ -3183,6 +3160,7 @@ class VocabularyApp:
         parent_window.destroy()
         self.generate_listening_questions()
     
+    # When no german text found online, then generate german text using ai
     def generate_german_text_with_ai(self):
         """Generate German text using OpenAI as fallback"""
         try:
