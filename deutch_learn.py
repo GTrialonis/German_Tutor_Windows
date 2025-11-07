@@ -1610,7 +1610,7 @@ class VocabularyApp:
             nav_frame.pack_forget()  # Hide navigation
             messagebox.showinfo("Cleared", "All highlights cleared")
         
-        def clear_field():
+        def new_entry():
             """Clear the input field to search for new word"""
             search_entry.delete(0, tk.END)
 
@@ -1623,7 +1623,7 @@ class VocabularyApp:
         
         # Main buttons
         ttk.Button(btn_frame, text="Search", command=perform_search).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Clear", command=clear_field).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Clear Word", command=new_entry).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Clear Highlights", command=clear_highlights).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Close", command=search_window.destroy).pack(side=tk.LEFT, padx=5)
         
