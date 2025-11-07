@@ -1519,7 +1519,7 @@ class VocabularyApp:
         tk.Label(search_window, text="Search for word:", bg="#222", fg="white").pack(pady=(10, 5))
         
         search_var = tk.StringVar()
-        search_entry = tk.Entry(search_window, textvariable=search_var, width=40, bg="#333", fg="white")
+        search_entry = tk.Entry(search_window, textvariable=search_var, width=40, bg="#333", fg="white") # this is input field
         search_entry.pack(pady=5)
         search_entry.focus()
         
@@ -1610,6 +1610,11 @@ class VocabularyApp:
             nav_frame.pack_forget()  # Hide navigation
             messagebox.showinfo("Cleared", "All highlights cleared")
         
+        def clear_field():
+            """Clear the input field to search for new word"""
+            search_entry.delete(0, tk.END)
+
+        
         # Navigation buttons
         ttk.Button(nav_btn_frame, text="◀ Previous", 
                 command=lambda: navigate_match("prev")).pack(side=tk.LEFT, padx=5)
@@ -1618,6 +1623,7 @@ class VocabularyApp:
         
         # Main buttons
         ttk.Button(btn_frame, text="Search", command=perform_search).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Clear", command=clear_field).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Clear Highlights", command=clear_highlights).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Close", command=search_window.destroy).pack(side=tk.LEFT, padx=5)
         
