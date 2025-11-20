@@ -2292,6 +2292,7 @@ class VocabularyApp:
     def clear_vocabulary(self):
         self.current_voc_file = None
         self.vocabulary_textbox.delete(1.0, tk.END)
+        self.current_voc_file = None
 
 
     def load_study_text(self):
@@ -2354,6 +2355,7 @@ class VocabularyApp:
     def clear_study_text(self):
         self.current_study_file = None
         self.study_textbox.delete(1.0, tk.END)
+        self.current_study_file = None
 
     def capture_text(self):
         """
@@ -2685,6 +2687,7 @@ class VocabularyApp:
             return
 
         self.current_word = random.choice(self.vocabulary)
+        self.glosbe_search_entry.delete(0, tk.END) # debug
         self.test_textbox.delete(1.0, tk.END)
         self.test_textbox.insert(tk.END, "Please translate the following:\n")
 
@@ -2705,6 +2708,7 @@ class VocabularyApp:
             self.test_textbox.insert(tk.END, f"--> {english_part}\n")
         else:
             self.test_textbox.insert(tk.END, f"--> {german_part}\n")
+            self.glosbe_search_entry.insert(tk.END, f"{german_part}\n") # debug
 
         # Clear the input field before displaying the new question
         self.answer_entry.delete(0, tk.END)
