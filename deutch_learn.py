@@ -1626,6 +1626,81 @@ class VocabularyApp:
             self.study_textbox.insert(tk.END, sentences)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to generate sentences: {str(e)}", parent=self.root)
+    
+    def search_vocabulary(self, vocab_text, search_term, search_type, case_sensitive):
+        """Search for terms in vocabulary text"""
+        lines = vocab_text.split('\n')
+        matches = []
+        
+        if not case_sensitive:
+            search_term = search_term.lower()
+        
+        for i, line in enumerate(lines):
+            if not line.strip() or '=' not in line:
+                continue
+                
+            try:
+                german, english = line.split('=', 1)
+                german = german.strip()
+                english = english.strip()
+                
+                if search_type in ["german", "both"]:
+                    text_to_search = german if case_sensitive else german.lower()
+                    if search_term in text_to_search:
+                        matches.append((i, line, "german"))
+                
+                if search_type in ["english", "both"]:
+                    text_to_search = english if case_sensitive else english.lower()
+                    if search_term in text_to_search:
+                        matches.append((i, line, "english"))
+                        
+            except ValueError:
+                continue
+        
+        return matches
+    
+    def highlight_vocabulary_matches(self, matches, search_term, case_sensitive):
+        """Highlight search matches in the vocabulary textbox"""
+        self.clear_vocabulary_highlights()
+        
+        # Configure highlight tag
+        self.vocabulary_textbox.tag_configure("search_highlight", background="yellow", foreground="black")
+        
+        for line_num, line, language in matches:
+            # Calculate start position of the line
+            start_pos = f"{line_num + 1}.0"
+            
+            if language == "german":
+                # Highlight German part (before =)
+                if '=' in line:
+                    german_part = line.split('=', 1)[0]
+                    start_idx = line.find(search_term) if case_sensitive else line.lower().find(search_term.lower())
+                    if start_idx != -1 and start_idx < len(german_part):
+                        start = f"{line_num + 1}.{start_idx}"
+                        end = f"{line_num + 1}.{start_idx + len(search_term)}"
+                        self.vocabulary_textbox.tag_add("search_highlight", start, end)
+            else:
+                # Highlight English part (after =)
+                if '=' in line:
+                    parts = line.split('=', 1)
+                    if len(parts) > 1:
+                        english_part = parts[1]
+                        start_idx = line.find(search_term) if case_sensitive else line.lower().find(search_term.lower())
+                        if start_idx != -1 and start_idx >= len(parts[0]):
+                            # Adjust for the = sign
+                            adjusted_start = start_idx
+                            start = f"{line_num + 1}.{adjusted_start}"
+                            end = f"{line_num + 1}.{adjusted_start + len(search_term)}"
+                            self.vocabulary_textbox.tag_add("search_highlight", start, end)
+        
+        # Scroll to first match
+        if matches:
+            first_line = matches[0][0] + 1
+            self.vocabulary_textbox.see(f"{first_line}.0")
+
+    def clear_vocabulary_highlights(self):
+        """Clear all search highlights"""
+        self.vocabulary_textbox.tag_remove("search_highlight", "1.0", tk.END)
 
     def fetch_ai_examples(self):
         """
