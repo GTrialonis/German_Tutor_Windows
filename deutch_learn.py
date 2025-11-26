@@ -2174,7 +2174,22 @@ ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
     # === FILE OPERATION PLACEHOLDERS ===
 
     def copy_study_text(self):
-        pass
+        """Copy the Study Text Box content to the clipboard."""
+        try:
+            content = self.study_textbox.get(1.0, tk.END).strip()
+
+            if not content:
+                messagebox.showwarning("No Text", "Study Text Box is empty.", parent=self.root)
+                return
+
+            # Update the clipboard
+            self.root.clipboard_clear()
+            self.root.clipboard_append(content)
+
+            # Optional feedback to the user
+            messagebox.showinfo("Copied", "Study text copied to clipboard!", parent=self.root)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to copy study text: {e}", parent=self.root)
 
     def load_study_text(self):
         """Load study text file"""
