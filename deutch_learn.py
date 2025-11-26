@@ -1229,15 +1229,67 @@ class VocabularyApp:
 
             Example: Buch, das, [Bücher, die] = book, volume, ledger
 
-            For Verbs (please pay attention to the Format described below):
+            ================================================
+*** VERBS — VERY IMPORTANT ***
+================================================
 
-            From any form of a verb found in the text (e.g., "spricht"), identify its infinitive (base form).
+From ANY finite or non-finite form of a verb found in the text (e.g., "spricht", "sprach", "gesprochen", "ging", "gegangen", "sprachts"), you MUST:
 
-            Format: Infinitive, [Präteritum, Perfekt] = to translation1, to translation2, to translation3
+1) Identify the INFINITIVE (base form).
+2) Identify:
+   - the Präteritum (simple past, 1st/3rd person singular form),
+   - the Partizip II (past participle, without auxiliary).
 
-            Always include "to" before the English translations.
+3) Output the verb ALWAYS in this EXACT format:
 
-            Example: sprechen, [sprach, gesprochen] = to speak, to talk
+Infinitive, [Präteritum, Perfekt-Partizip] = to translation1, to translation2, to translation3
+
+CRITICAL VERB RULES (MUST FOLLOW):
+
+- The part inside the square brackets MUST contain exactly TWO German forms:
+  1. First: Präteritum (1st/3rd person singular),
+  2. Second: Partizip II (past participle only, WITHOUT "hat"/"ist").
+
+- Do NOT include any auxiliary verbs in the brackets:
+  - WRONG: sprechen, [sprach, hat gesprochen]
+  - CORRECT: sprechen, [sprach, gesprochen]
+
+- Always start each English translation with "to".
+  - Example: to speak, to talk
+  - If there is only one natural translation, you may give just one.
+  - Maximum three translations.
+
+- If you are uncertain, still give your best guess for [Präteritum, Partizip II] but ALWAYS keep the same format.
+
+Examples (PAY CLOSE ATTENTION):
+
+- Encounter: "spricht", "sprach", "gesprochen", or "sprachts"
+  Output: sprechen, [sprach, gesprochen] = to speak, to talk
+
+- Encounter: "ging", "geht", "gegangen"
+  Output: gehen, [ging, gegangen] = to go, to walk
+
+- Encounter: "nahm", "nimmt", "genommen"
+  Output: nehmen, [nahm, genommen] = to take
+
+- Encounter: "arbeitete", "arbeitet", "gearbeitet"
+  Output: arbeiten, [arbeitete, gearbeitet] = to work
+
+- Modal verb:
+  Encounter: "kann", "konnte", "gekonnt"
+  Output: können, [konnte, gekonnt] = to be able, to can
+
+- Separable verb:
+  Encounter: "stand auf", "aufgestanden", "steht auf"
+  Output: aufstehen, [stand auf, aufgestanden] = to get up, to stand up
+
+- Prefix verb:
+  Encounter: "verstand", "verstanden"
+  Output: verstehen, [verstand, verstanden] = to understand
+
+Do NOT add extra grammatical information to verb lines.
+Do NOT add aspect, voice labels, or auxiliary forms.
+ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
 
             For Adjectives:
 
@@ -1253,7 +1305,7 @@ class VocabularyApp:
 
             Format: German Word = translation1, translation2, translation3
 
-            Example: oft = often, frequently"""  # Your full prompt here
+            Example: oft = often, frequently"""
 
             response = client.chat.completions.create(model="gpt-4o",
             messages=[
