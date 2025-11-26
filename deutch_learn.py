@@ -120,6 +120,7 @@ class VocabularyApp:
         color_styles = {
             'SmallPurple.TButton': {'background': '#ca74ea', 'foreground': 'black'},
             'SmallBlue.TButton': {'background': '#73A2D0', 'foreground': 'black'},
+            'SmallBrownish.TButton': {'background': "#d4d0ac", 'foreground': 'black'},
             'SmallGreen.TButton': {'background': '#008844', 'foreground': 'black'},
             'SmallRed.TButton': {'background': '#AA0000', 'foreground': 'black'},
             'SmallGoldBrown.TButton': {'background': '#AA8800', 'foreground': 'black'},
@@ -135,8 +136,8 @@ class VocabularyApp:
             'SmallWhite.TButton': {'background': '#7B7D7D', 'foreground': 'white'},
             'SmallGoldYellow.TButton': {'background': '#EBCE65', 'foreground': 'black'},
             'SmallBlueish.TButton': {'background': '#5D6D7E', 'foreground': 'white'},
-            'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'}
-        }
+            'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'}        
+            }
         
         for style_name, colors in color_styles.items():
             self.style.configure(style_name, 
@@ -669,17 +670,41 @@ class VocabularyApp:
                 self.speak_text(text, voice_var.get())
             else:
                 messagebox.showwarning("No Text", "Study Text Box is empty.")
+
+        def listen_from_clipboard():
+            """Read text from clipboard and speak it."""
+            text = ""
+            try:
+                # Try popup window clipboard first
+                text = listen_window.clipboard_get()
+            except Exception:
+                try:
+                    # Fallback to root clipboard
+                    text = self.root.clipboard_get()
+                except Exception:
+                    text = ""
+
+            if text and text.strip():
+                self.speak_text(text, voice_var.get())
+            else:
+                messagebox.showwarning("No Text", "Clipboard has no text to read.")
         
         # Buttons
         btn_frame = tk.Frame(listen_window, bg="#222")
         btn_frame.pack(pady=20)
-        
+
         ttk.Button(btn_frame, text="Load TXT File", 
-                  command=listen_from_file).pack(pady=5, fill=tk.X)
+              style='SmallBlue.TButton',
+              command=listen_from_file).pack(pady=5, fill=tk.X)
         ttk.Button(btn_frame, text="Read from Study Text Box", 
-                  command=listen_from_study_box).pack(pady=5, fill=tk.X)
+              style='SmallGreen.TButton',
+              command=listen_from_study_box).pack(pady=5, fill=tk.X)
+        ttk.Button(btn_frame, text="Read from Clipboard",
+              style='SmallPurple.TButton',
+              command=listen_from_clipboard).pack(pady=5, fill=tk.X)
         ttk.Button(btn_frame, text="Cancel", 
-                  command=listen_window.destroy).pack(pady=5, fill=tk.X)
+              style='SmallRed.TButton',
+              command=listen_window.destroy).pack(pady=5, fill=tk.X)
 
     def speak_text(self, text, voice="alloy"):
         """Speak text using TTS"""
@@ -828,7 +853,7 @@ class VocabularyApp:
         
         # Group 1: Vocabulary Buttons
         vocab_btn_frame = tk.Frame(middle_frame, bg="#222")
-        vocab_btn_frame.pack(pady=(0, 25))
+        vocab_btn_frame.pack(pady=(0, 10))
 
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='SmallBlue.TButton', command=self.load_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
@@ -840,10 +865,11 @@ class VocabularyApp:
 
         # Group 2: Study Text Buttons
         study_btn_frame = tk.Frame(middle_frame, bg="#222")
-        study_btn_frame.pack(pady=(15, 15))
+        study_btn_frame.pack(pady=(2, 2)) # debug (15 replaced by 5)
 
         ttk.Button(study_btn_frame, text="LOAD-TXT", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
         ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='SmallLightPurple.TButton', command=self.capture_text).pack(pady=2)
@@ -996,6 +1022,7 @@ class VocabularyApp:
                     style='SmallPurple.TButton',
                     command=self.generate_comprehension_questions
                 ).pack(side='left', padx=(15, 3), pady=3)
+            
             
             if label_text == "Study Text Box:":
                 ttk.Button(
@@ -1165,7 +1192,68 @@ class VocabularyApp:
 
             configure_openai()
 
-            prompt = """You are a German-English linguistic analysis tool. Your task is to process a German text and generate a formatted vocabulary list..."""  # Your full prompt here
+            prompt = """You are a German-English linguistic analysis tool. Your task is to process a German text, filter it based on a custom stopword list, and then generate a formatted vocabulary list with specific grammatical information and English translations.
+
+            Objective:
+            Analyze the provided German text file to create a unique vocabulary list. The order of the words in the final output must match the order in which the first instance of each word appeared in the source text. Each entry in the list must be formatted according to its part of speech (noun, verb, adjective, or other) and translated into English.
+
+            Processing Workflow:
+
+            Tokenize and Normalize: Read the entire text. Break it down into individual words (tokens). Treat all punctuation (e.g., , . ! ? ; : " ') as delimiters and remove it from the words.
+
+            Filter Stopwords: Create a list of all words from the text, maintaining their original order of appearance. From this list, remove any word that appears in the stopword list below. Then, create a final unique list, keeping only the first occurrence of each word.
+
+            Stopword List: der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, er, sie, es, wir, ihr, Sie, in, an, auf, unter, über, vor, hinter, neben, zwischen, mit, nach, bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich, uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird, Frühling, Sommer, Herbst, Winter
+
+            Lemmatize and Analyze: For each unique word in the ordered list, determine its base form (lemma) and its part of speech (noun, verb, adjective, adverb, etc.).
+
+            Format and Translate: Generate the final output list. Follow the output formatting rules below precisely.
+
+            Output Formatting Rules:
+
+            General:
+
+            DO NOT precede any entry with markup, numbers, bullets, hyphens, or any other characters. Each entry begins with the German word itself.
+
+            Each entry must be on a new line.
+
+            Provide a maximum of THREE English translations for each word.
+
+            Do not sort the final list. The order of words must correspond to the order in which their first instance appeared in the original text.
+
+            For Nouns:
+
+            From any form of a noun found in the text (e.g., "Buches"), identify its SINGULAR, NOMINATIVE form.
+
+            Format: SINGULAR Form, Article, [Plural Form, Plural Article] = translation1, translation2, translation3
+
+            Example: Buch, das, [Bücher, die] = book, volume, ledger
+
+            For Verbs (please pay attention to the Format described below):
+
+            From any form of a verb found in the text (e.g., "spricht"), identify its infinitive (base form).
+
+            Format: Infinitive, [Präteritum, Perfekt] = to translation1, to translation2, to translation3
+
+            Always include "to" before the English translations.
+
+            Example: sprechen, [sprach, gesprochen] = to speak, to talk
+
+            For Adjectives:
+
+            From any form of an adjective, identify its positive (base) form.
+
+            Format: Positive Form, [Comparative Form, Superlative Form] = translation1, translation2, translation3
+
+            Example: schnell, [schneller, schnellsten] = fast, quick, rapid
+
+            For Adverbs and All Other Word Types:
+
+            Display the word in its base/dictionary form.
+
+            Format: German Word = translation1, translation2, translation3
+
+            Example: oft = often, frequently"""  # Your full prompt here
 
             response = client.chat.completions.create(model="gpt-4o",
             messages=[
@@ -2033,6 +2121,9 @@ class VocabularyApp:
 
     # === FILE OPERATION PLACEHOLDERS ===
 
+    def copy_study_text(self):
+        pass
+
     def load_study_text(self):
         """Load study text file"""
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
@@ -2046,7 +2137,7 @@ class VocabularyApp:
                 title = self.extract_title_from_text(content)
                 
                 # Update the label - search more broadly
-                self.update_study_textbox_label(title)
+                self.update_study_text_label(title)
                 
                 # Remove title line and insert cleaned content
                 cleaned_content = self.remove_title_line(content)
