@@ -235,6 +235,26 @@ class VocabularyApp:
             """Handle cancel operation"""
             self.ensure_prompt_ai_enabled()
             listen_comp_window.destroy()
+
+        def on_clipboard_select():
+            """Use text currently in the clipboard for listening comprehension."""
+            text = ""
+            try:
+                text = listen_comp_window.clipboard_get()
+            except Exception:
+                try:
+                    text = self.root.clipboard_get()
+                except Exception:
+                    text = ""
+
+            if not text or not text.strip():
+                messagebox.showwarning("No Text", "Clipboard has no text to use for listening comprehension.", parent=listen_comp_window)
+                return
+
+            self.listening_comprehension_text = text
+            self.current_voice = voice_var.get()
+            listen_comp_window.destroy()
+            self.start_listening_comprehension_flow()
         
         # Create buttons
         ttk.Button(btn_frame, text="Select Text File", 
@@ -242,12 +262,16 @@ class VocabularyApp:
                   command=on_file_select).pack(pady=5, fill=tk.X)
         
         ttk.Button(btn_frame, text="Search Internet for German Text", 
-                  style='SmallGreen.TButton',
-                  command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
-        
+              style='SmallGreen.TButton',
+              command=lambda: self.search_german_text(listen_comp_window, voice_var.get())).pack(pady=5, fill=tk.X)
+
+        ttk.Button(btn_frame, text="Use Clipboard Text",
+              style='SmallPurple.TButton',
+              command=on_clipboard_select).pack(pady=5, fill=tk.X)
+
         ttk.Button(btn_frame, text="Cancel", 
-                  style='SmallRed.TButton',
-                  command=on_cancel).pack(pady=5, fill=tk.X)
+              style='SmallRed.TButton',
+              command=on_cancel).pack(pady=5, fill=tk.X)
         
         # Handle window close
         listen_comp_window.protocol("WM_DELETE_WINDOW", on_cancel)
@@ -415,7 +439,21 @@ class VocabularyApp:
         if not self.current_questions:
             messagebox.showwarning("No Questions", "No questions were generated.")
             return
-        
+        # If Translation Box already has content, ask user whether to save it
+        existing_translation = self.translation_textbox.get(1.0, tk.END).strip()
+        if existing_translation:
+            prompt = "Translation Box contains text. Save current content before replacing?"
+            choice = messagebox.askyesnocancel("Translation Box Not Empty", prompt, parent=self.root)
+            if choice is None:
+                # User cancelled - abort
+                return
+            elif choice:
+                # User chose to save first
+                try:
+                    self.save_translation()
+                except Exception as e:
+                    messagebox.showerror("Save Error", f"Failed to save translation: {e}", parent=self.root)
+
         # Display first question in translation box
         self.translation_textbox.delete(1.0, tk.END)
         self.translation_textbox.insert(tk.END, "Answer these questions in German:\n\n")
@@ -426,6 +464,8 @@ class VocabularyApp:
         # Instructions in input box
         self.input_textbox.delete(1.0, tk.END)
         self.input_textbox.insert(tk.END, "Type your answers to the questions here, one after another. Click 'Eval.Answer' after each answer.")
+        # Note: Do NOT save the inserted comprehension questions to the translation file.
+        # Only the user's pre-existing translation will be saved earlier if they chose to.
 
     def handle_listening_answer(self):
         """Handle answer evaluation for listening comprehension"""
