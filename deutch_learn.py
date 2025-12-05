@@ -1388,20 +1388,46 @@ ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
 
     def save_vocabulary(self):
         """Save vocabulary to file"""
+        filename = None  # Initialize filename to None
+        
         if not self.current_voc_file:
+            # First save - ask for filename
             filename = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text files", "*.txt")]
             )
-            if filename:
-                nwext = os.path.splitext(filename)[0]
-                if '_VOC' not in filename:
-                    filename = nwext + '_VOC.txt'
-                self.current_voc_file = filename
-            else:
-                self.current_voc_file = filename
+            if not filename:  # User cancelled
+                return
 
-        if filename:
+            nwext = os.path.splitext(filename)[0]
+            if '_VOC' not in filename:
+                filename = nwext + '_VOC.txt'
+            self.current_voc_file = filename
+        else:
+            # Subsequent saves - ask whether to overwrite or create new
+            choice = messagebox.askyesnocancel(
+                "Save Options",
+                f"Overwrite existing file?\n{self.current_voc_file}\n\n"
+                "Yes = Overwrite\nNo = Save as new file\nCancel = Abort")
+
+            if choice is None:  # User cancelled
+                return
+            elif choice:  # Overwrite
+                filename = self.current_voc_file
+            else:  # Save as new file
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt")]
+                )
+                if filename:
+                    nwext = os.path.splitext(filename)[0]
+                    if '_VOC' not in filename:
+                        filename = nwext + '_VOC.txt'
+                    self.current_voc_file = filename
+                else:
+                    return  # User cancelled
+
+        if filename:  # Now filename is guaranteed to be defined
             with open(filename, 'w', encoding='utf-8-sig') as file:
                 content = self.vocabulary_textbox.get(1.0, tk.END)
                 file.write(content)
@@ -2212,26 +2238,29 @@ ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
                 self.study_textbox.insert(tk.END, cleaned_content)
 
     def save_study_text(self):
-        """Save study text file"""
-        if not self.current_study_file:  # If no file was loaded, ask where to save
+        """Save study text to file"""
+        filename = None  # Initialize filename to None
+        
+        if not self.current_study_file:
             filename = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text files", "*.txt")]
             )
 
             if filename:
-                nwext = os.path.splitext(filename)[0] # nwext = name without extension (here '_TXT)
+                nwext = os.path.splitext(filename)[0]
                 if '_TXT' not in filename:
                     filename = nwext + '_TXT.txt'
-                self.current_study_file = filename  # Update current file for future saves
+                self.current_study_file = filename
+            else:
+                return  # User cancelled
         else:
-            filename = self.current_study_file  # Use the stored filename
+            filename = self.current_study_file
 
-        if filename:
+        if filename:  # Now filename is guaranteed to be defined
             with open(filename, 'w', encoding='utf-8-sig') as file:
                 content = self.study_textbox.get(1.0, tk.END)
                 file.write(content)
-            # Show success message with file path
             messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
 
     def clear_study_text(self):
@@ -2259,8 +2288,9 @@ ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
             return
 
     def save_translation(self):
-        """Save translation file"""
         """Save translation back to the original file if known, otherwise use filedialog"""
+        filename = None  # Initialize filename to None
+        
         if hasattr(self, 'current_translation_file') and self.current_translation_file:
             # Save to the known file
             try:
