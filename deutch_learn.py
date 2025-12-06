@@ -1047,12 +1047,12 @@ class VocabularyApp:
                 command=lambda: self.clear_text_highlight(textbox)
             ).pack(side='left', padx=3, pady=3)
 
-            ttk.Button(
-                button_frame,
-                text="🔍 Search Text",
-                style='SmallGoldenSummer.TButton',
-                command=self.search_text
-            ).pack(side='left', padx=3, pady=3)
+            # ttk.Button(
+            #     button_frame,
+            #     text="🔍 Search Text",
+            #     style='SmallGoldenSummer.TButton',
+            #     command=self.search_text
+            # ).pack(side='left', padx=3, pady=3)
             
             # Add the "READING Comprehension" button only for Study Text Box
             if label_text == "Study Text Box:":
@@ -1096,9 +1096,9 @@ class VocabularyApp:
         """Clear highlight from the given textbox"""
         textbox.tag_remove("highlight", "1.0", tk.END)
 
-    def search_text(self): # debug -- I may have to remove this and the related button
-        """Placeholder for search text functionality"""
-        pass
+    # def search_text(self): # debug -- I may have to remove this and the related button
+    #     """Placeholder for search text functionality"""
+    #     pass
 
     def highlight_selection(self, event=None):
         """Highlight selected text (keyboard shortcut)"""
@@ -1217,8 +1217,38 @@ class VocabularyApp:
         self.input_textbox.delete(1.0, tk.END)
 
     def create_vocabulary(self):
-        """AI creates vocabulary from txt file with content warning"""
-        self.check_content_and_warn(self._create_vocabulary_impl)
+        """AI creates vocabulary from txt file.
+
+        Warn only if the `Vocabulary (Current)` textbox contains content. If it does,
+        ask the user whether to save the existing vocabulary, overwrite it, or cancel.
+        """
+        self.check_vocabulary_and_warn(self._create_vocabulary_impl)
+
+    def check_vocabulary_and_warn(self, operation_callback, *args):
+        """Prompt the user only if the Vocabulary textbox already contains text.
+
+        Yes = save current vocabulary (calls `save_vocabulary`) then continue
+        No  = continue and overwrite without saving
+        Cancel = abort
+        """
+        try:
+            vocab_content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+        except Exception:
+            vocab_content = ''
+
+        if vocab_content:
+            prompt = "Vocabulary textbox contains text. Save current vocabulary before creating a new one?"
+            choice = messagebox.askyesnocancel("Vocabulary Not Empty", prompt, parent=self.root)
+            if choice is None:
+                return False
+            elif choice:
+                try:
+                    self.save_vocabulary()
+                except Exception as e:
+                    messagebox.showerror("Save Error", f"Failed to save vocabulary: {e}", parent=self.root)
+
+        operation_callback(*args)
+        return True
 
     def _create_vocabulary_impl(self):
         """Actual implementation of create_vocabulary"""
