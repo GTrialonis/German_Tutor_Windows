@@ -377,6 +377,58 @@ class VocabularyApp:
         
         check_reading_complete()
 
+    def create_translation_listen_popup(self):
+        """Popup to choose to listen to a translation file or the Translation Box content."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Listen to Translation")
+        popup.configure(bg="#222")
+        popup.geometry("380x180")
+        popup.transient(self.root)
+        popup.grab_set()
+
+        # Center
+        popup.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        tk.Label(popup, text="Listen to Translation", bg="#222", fg="white", font=("Helvetica", 11, "bold")).pack(pady=(10, 5))
+
+        # Buttons frame
+        btn_frame = tk.Frame(popup, bg="#222")
+        btn_frame.pack(fill=tk.X, padx=20, pady=10)
+
+        def choose_file():
+            filename = filedialog.askopenfilename(title="Select translation file", filetypes=[("Translation files", "*_TRA.txt"), ("Text files", "*.txt"), ("All files", "*.*")], parent=popup)
+            if filename:
+                try:
+                    with open(filename, 'r', encoding='utf-8-sig') as f:
+                        text = f.read()
+                    popup.destroy()
+                    # Use current voice if available
+                    voice = getattr(self, 'current_voice', 'alloy')
+                    self.speak_text(text, voice)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to read file: {e}", parent=popup)
+
+        def read_from_box():
+            text = self.translation_textbox.get(1.0, tk.END).strip()
+            if not text:
+                messagebox.showwarning("No Text", "Translation Box is empty.", parent=popup)
+                return
+            popup.destroy()
+            voice = getattr(self, 'current_voice', 'alloy')
+            self.speak_text(text, voice)
+
+        def on_cancel():
+            popup.destroy()
+
+        ttk.Button(btn_frame, text="Select _TRA.txt File", style='SmallBlue.TButton', command=choose_file).pack(pady=6, fill=tk.X)
+        ttk.Button(btn_frame, text="Read from Translation Box", style='SmallGreen.TButton', command=read_from_box).pack(pady=6, fill=tk.X)
+        ttk.Button(btn_frame, text="Cancel", style='SmallRed.TButton', command=on_cancel).pack(pady=6, fill=tk.X)
+
+        popup.protocol("WM_DELETE_WINDOW", on_cancel)
+
     def generate_listening_questions(self):
         """Generate comprehension questions based on the German text"""
         try:
@@ -572,48 +624,127 @@ class VocabularyApp:
     def read_text(self, text_content, status_label, progress_var, play_button, pause_button, voice):
         """Read text using TTS"""
         try:
-            # Generate speech
-            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
-                audio_file = temp_audio.name
-            
-            try:
-                response = self.client.audio.speech.create(
-                    model="tts-1",
-                    voice=voice,
-                    input=text_content,
-                )
-                response.stream_to_file(audio_file)
-            except Exception as e:
-                # Fallback to gTTS
-                tts = gTTS(text=text_content, lang='de', slow=False)
-                tts.save(audio_file)
-            
-            # Play audio
-            if pygame.mixer.music.get_busy():
-                pygame.mixer.music.stop()
-            
-            pygame.mixer.music.load(audio_file)
-            pygame.mixer.music.play()
-            
-            # Wait for playback
-            start_time = time.time()
-            estimated_duration = len(text_content) * 0.1
-            
-            while (pygame.mixer.music.get_busy() or self.reading_paused) and self.is_reading:
-                if not self.reading_paused:
-                    elapsed = time.time() - start_time
-                    progress = min((elapsed / estimated_duration) * 100, 100) if estimated_duration > 0 else 0
+            # Helper: split into manageable chunks to avoid API length limits
+            def chunk_text_local(text, max_chars=4000):
+                import re
+                if not text:
+                    return []
+                if len(text) <= max_chars:
+                    return [text]
+                # Split on sentence boundaries if possible
+                sentences = re.split(r'(?<=[\.\!\?])\s+', text)
+                chunks = []
+                current = ""
+                for s in sentences:
+                    if len(current) + len(s) + 1 <= max_chars:
+                        current = (current + " " + s).strip()
+                    else:
+                        if current:
+                            chunks.append(current)
+                        # If single sentence too long, hard-split it
+                        if len(s) > max_chars:
+                            for i in range(0, len(s), max_chars):
+                                chunks.append(s[i:i+max_chars])
+                            current = ""
+                        else:
+                            current = s
+                if current:
+                    chunks.append(current)
+                return chunks
+
+            def generate_audio_files_for_text(text, voice, max_chars=4000):
+                audio_files = []
+                chunks = chunk_text_local(text, max_chars=max_chars)
+                if not chunks:
+                    return audio_files
+                for idx, chunk in enumerate(chunks):
+                    with tempfile.NamedTemporaryFile(suffix=f'_{idx}.mp3', delete=False) as temp_audio:
+                        audio_path = temp_audio.name
                     try:
-                        progress_var.set(progress)
-                    except:
-                        pass
-                time.sleep(0.1)
-            
+                        # Use streaming response API when available to avoid deprecation warning
+                        speech_api = getattr(self.client, 'audio').speech
+                        try:
+                            if hasattr(speech_api, 'with_streaming_response'):
+                                with speech_api.with_streaming_response.create(
+                                    model="tts-1", voice=voice, input=chunk
+                                ) as stream:
+                                    # Prefer helper if present
+                                    if hasattr(stream, 'stream_to_file'):
+                                        stream.stream_to_file(audio_path)
+                                    else:
+                                        # Iterate events and write any audio bytes found
+                                        with open(audio_path, 'wb') as wf:
+                                            for evt in stream:
+                                                # try common attribute names
+                                                data = getattr(evt, 'data', None) or getattr(evt, 'chunk', None)
+                                                if isinstance(data, (bytes, bytearray)):
+                                                    wf.write(data)
+                            else:
+                                response = speech_api.create(model="tts-1", voice=voice, input=chunk)
+                                if hasattr(response, 'stream_to_file'):
+                                    response.stream_to_file(audio_path)
+                                else:
+                                    # Last resort: try to extract bytes
+                                    if isinstance(response, (bytes, bytearray)):
+                                        with open(audio_path, 'wb') as wf:
+                                            wf.write(response)
+                                    else:
+                                        raise Exception('No streaming method available on TTS response')
+                        except Exception:
+                            # If streaming failed for any reason, fallback to gTTS
+                            try:
+                                tts = gTTS(text=chunk, lang='de', slow=False)
+                                tts.save(audio_path)
+                            except Exception:
+                                raise
+                        audio_files.append(audio_path)
+                    except Exception as e:
+                        # Cleanup any generated files so far
+                        for f in audio_files:
+                            try:
+                                os.unlink(f)
+                            except Exception:
+                                pass
+                        raise
+                return audio_files
+
+            # Generate audio files (chunks)
+            audio_files = generate_audio_files_for_text(text_content, voice)
+
+            # Play audio files sequentially and respect pause/resume
+            total_chars = max(1, len(text_content))
+            played_chars = 0
+            for audio_file in audio_files:
+                if not self.is_reading:
+                    break
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.stop()
+                pygame.mixer.music.load(audio_file)
+                pygame.mixer.music.play()
+
+                # Wait while this chunk plays (respect pause)
+                while (pygame.mixer.music.get_busy() or self.reading_paused) and self.is_reading:
+                    if self.reading_paused:
+                        time.sleep(0.1)
+                        continue
+                    # Update progress estimate based on characters
+                    # We approximate chunk contribution by file size / char ratio
+                    played_chars += max(1, len(text_content) // max(1, len(audio_files)))
+                    percent = min(100.0, (played_chars / total_chars) * 100.0)
+                    self.safe_ui_update(progress_var, "set", percent)
+                    time.sleep(0.1)
+
+            # Cleanup generated chunk files
+            for f in audio_files:
+                try:
+                    os.unlink(f)
+                except Exception:
+                    pass
+
             # Update UI when finished
             if self.is_reading:
-                self.safe_ui_update(progress_var, "set", 100)
-                self.safe_ui_update(status_label, "config", text="Reading complete", fg="lightblue")
-                
+                self.safe_ui_update(status_label, "config", text="Finished", fg="lightgreen")
+
         except Exception as e:
             print(f"Error in read_text: {e}")
             self.safe_ui_update(status_label, "config", text=f"Error: {str(e)}", fg="red")
@@ -622,7 +753,6 @@ class VocabularyApp:
             self.reading_paused = False
             self.safe_ui_update(play_button, "config", state=tk.NORMAL)
             self.safe_ui_update(pause_button, "config", state=tk.DISABLED, text="Pause")
-            self.safe_cleanup_audio_file(audio_file)
 
     def safe_ui_update(self, widget, method, *args, **kwargs):
         """Safely update UI elements from threads"""
@@ -749,25 +879,107 @@ class VocabularyApp:
     def speak_text(self, text, voice="alloy"):
         """Speak text using TTS"""
         try:
-            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_audio:
-                audio_file = temp_audio.name
-            
-            response = self.client.audio.speech.create(
-                model="tts-1",
-                voice=voice,
-                input=text,
-            )
-            response.stream_to_file(audio_file)
-            
-            if pygame.mixer.music.get_busy():
-                pygame.mixer.music.stop()
-            
-            pygame.mixer.music.load(audio_file)
-            pygame.mixer.music.play()
-            
-            # Cleanup in background
-            threading.Thread(target=self.wait_and_cleanup, args=(audio_file,), daemon=True).start()
-            
+            # If text is short, use direct generation. For long text, split into chunks.
+            def chunk_text_local(text, max_chars=4000):
+                import re
+                if not text:
+                    return []
+                if len(text) <= max_chars:
+                    return [text]
+                sentences = re.split(r'(?<=[\.\!\?])\s+', text)
+                chunks = []
+                current = ""
+                for s in sentences:
+                    if len(current) + len(s) + 1 <= max_chars:
+                        current = (current + " " + s).strip()
+                    else:
+                        if current:
+                            chunks.append(current)
+                        if len(s) > max_chars:
+                            for i in range(0, len(s), max_chars):
+                                chunks.append(s[i:i+max_chars])
+                            current = ""
+                        else:
+                            current = s
+                if current:
+                    chunks.append(current)
+                return chunks
+
+            def generate_audio_files_for_text(text, voice, max_chars=4000):
+                audio_files = []
+                chunks = chunk_text_local(text, max_chars=max_chars)
+                if not chunks:
+                    return audio_files
+                for idx, chunk in enumerate(chunks):
+                    with tempfile.NamedTemporaryFile(suffix=f'_{idx}.mp3', delete=False) as temp_audio:
+                        audio_path = temp_audio.name
+                    try:
+                        # Use streaming response API when available to avoid deprecation warning
+                        speech_api = getattr(self.client, 'audio').speech
+                        try:
+                            if hasattr(speech_api, 'with_streaming_response'):
+                                with speech_api.with_streaming_response.create(
+                                    model="tts-1", voice=voice, input=chunk
+                                ) as stream:
+                                    if hasattr(stream, 'stream_to_file'):
+                                        stream.stream_to_file(audio_path)
+                                    else:
+                                        with open(audio_path, 'wb') as wf:
+                                            for evt in stream:
+                                                data = getattr(evt, 'data', None) or getattr(evt, 'chunk', None)
+                                                if isinstance(data, (bytes, bytearray)):
+                                                    wf.write(data)
+                            else:
+                                response = speech_api.create(model="tts-1", voice=voice, input=chunk)
+                                if hasattr(response, 'stream_to_file'):
+                                    response.stream_to_file(audio_path)
+                                else:
+                                    if isinstance(response, (bytes, bytearray)):
+                                        with open(audio_path, 'wb') as wf:
+                                            wf.write(response)
+                                    else:
+                                        raise Exception('No streaming method available on TTS response')
+                        except Exception:
+                            try:
+                                tts = gTTS(text=chunk, lang='de', slow=False)
+                                tts.save(audio_path)
+                            except Exception:
+                                raise
+                        audio_files.append(audio_path)
+                    except Exception:
+                        for f in audio_files:
+                            try:
+                                os.unlink(f)
+                            except Exception:
+                                pass
+                        raise
+                return audio_files
+
+            # Generate and play in a background thread so UI isn't blocked
+            def generate_and_play():
+                try:
+                    files = generate_audio_files_for_text(text, voice)
+                    for f in files:
+                        if pygame.mixer.music.get_busy():
+                            pygame.mixer.music.stop()
+                        pygame.mixer.music.load(f)
+                        pygame.mixer.music.play()
+                        while pygame.mixer.music.get_busy():
+                            time.sleep(0.1)
+                    # cleanup
+                    for f in files:
+                        try:
+                            os.unlink(f)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    try:
+                        messagebox.showerror("TTS Error", f"Failed to generate speech: {str(e)}")
+                    except Exception:
+                        print(f"TTS Error: {e}")
+
+            threading.Thread(target=generate_and_play, daemon=True).start()
+
         except Exception as e:
             messagebox.showerror("TTS Error", f"Failed to generate speech: {str(e)}")
 
@@ -1071,6 +1283,15 @@ class VocabularyApp:
                     style='SmallGoldYellow.TButton',
                     command=self.create_listening_comprehension
                 ).pack(side='left', padx=(15, 3), pady=3)
+
+            # Add Listen-to-Translation button for the Translation Box
+            if label_text == "Translation Box:":
+                ttk.Button(
+                    button_frame,
+                    text="LISTEN to the translation",
+                    style='SmallBlue.TButton',
+                    command=self.create_translation_listen_popup
+                ).pack(side='left', padx=(10, 3), pady=3)
         
         return textbox
 
@@ -1300,66 +1521,66 @@ class VocabularyApp:
             Example: Buch, das, [Bücher, die] = book, volume, ledger
 
             ================================================
-*** VERBS — VERY IMPORTANT ***
-================================================
+            *** VERBS — VERY IMPORTANT ***
+            ================================================
 
-From ANY finite or non-finite form of a verb found in the text (e.g., "spricht", "sprach", "gesprochen", "ging", "gegangen", "sprachts"), you MUST:
+            From ANY finite or non-finite form of a verb found in the text (e.g., "spricht", "sprach", "gesprochen", "ging", "gegangen", "sprachts"), you MUST:
 
-1) Identify the INFINITIVE (base form).
-2) Identify:
-   - the Präteritum (simple past, 1st/3rd person singular form),
-   - the Partizip II (past participle, without auxiliary).
+            1) Identify the INFINITIVE (base form).
+            2) Identify:
+            - the Präteritum (simple past, 1st/3rd person singular form),
+            - the Partizip II (past participle, without auxiliary).
 
-3) Output the verb ALWAYS in this EXACT format:
+            3) Output the verb ALWAYS in this EXACT format:
 
-Infinitive, [Präteritum, Perfekt-Partizip] = to translation1, to translation2, to translation3
+            Infinitive, [Präteritum, Perfekt-Partizip] = to translation1, to translation2, to translation3
 
-CRITICAL VERB RULES (MUST FOLLOW):
+            CRITICAL VERB RULES (MUST FOLLOW):
 
-- The part inside the square brackets MUST contain exactly TWO German forms:
-  1. First: Präteritum (1st/3rd person singular),
-  2. Second: Partizip II (past participle only, WITHOUT "hat"/"ist").
+            - The part inside the square brackets MUST contain exactly TWO German forms:
+            1. First: Präteritum (1st/3rd person singular),
+            2. Second: Partizip II (past participle only, WITHOUT "hat"/"ist").
 
-- Do NOT include any auxiliary verbs in the brackets:
-  - WRONG: sprechen, [sprach, hat gesprochen]
-  - CORRECT: sprechen, [sprach, gesprochen]
+            - Do NOT include any auxiliary verbs in the brackets:
+            - WRONG: sprechen, [sprach, hat gesprochen]
+            - CORRECT: sprechen, [sprach, gesprochen]
 
-- Always start each English translation with "to".
-  - Example: to speak, to talk
-  - If there is only one natural translation, you may give just one.
-  - Maximum three translations.
+            - Always start each English translation with "to".
+            - Example: to speak, to talk
+            - If there is only one natural translation, you may give just one.
+            - Maximum three translations.
 
-- If you are uncertain, still give your best guess for [Präteritum, Partizip II] but ALWAYS keep the same format.
+            - If you are uncertain, still give your best guess for [Präteritum, Partizip II] but ALWAYS keep the same format.
 
-Examples (PAY CLOSE ATTENTION):
+            Examples (PAY CLOSE ATTENTION):
 
-- Encounter: "spricht", "sprach", "gesprochen", or "sprachts"
-  Output: sprechen, [sprach, gesprochen] = to speak, to talk
+            - Encounter: "spricht", "sprach", "gesprochen", or "sprachts"
+            Output: sprechen, [sprach, gesprochen] = to speak, to talk
 
-- Encounter: "ging", "geht", "gegangen"
-  Output: gehen, [ging, gegangen] = to go, to walk
+            - Encounter: "ging", "geht", "gegangen"
+            Output: gehen, [ging, gegangen] = to go, to walk
 
-- Encounter: "nahm", "nimmt", "genommen"
-  Output: nehmen, [nahm, genommen] = to take
+            - Encounter: "nahm", "nimmt", "genommen"
+            Output: nehmen, [nahm, genommen] = to take
 
-- Encounter: "arbeitete", "arbeitet", "gearbeitet"
-  Output: arbeiten, [arbeitete, gearbeitet] = to work
+            - Encounter: "arbeitete", "arbeitet", "gearbeitet"
+            Output: arbeiten, [arbeitete, gearbeitet] = to work
 
-- Modal verb:
-  Encounter: "kann", "konnte", "gekonnt"
-  Output: können, [konnte, gekonnt] = to be able, to can
+            - Modal verb:
+            Encounter: "kann", "konnte", "gekonnt"
+            Output: können, [konnte, gekonnt] = to be able, to can
 
-- Separable verb:
-  Encounter: "stand auf", "aufgestanden", "steht auf"
-  Output: aufstehen, [stand auf, aufgestanden] = to get up, to stand up
+            - Separable verb:
+            Encounter: "stand auf", "aufgestanden", "steht auf"
+            Output: aufstehen, [stand auf, aufgestanden] = to get up, to stand up
 
-- Prefix verb:
-  Encounter: "verstand", "verstanden"
-  Output: verstehen, [verstand, verstanden] = to understand
+            - Prefix verb:
+            Encounter: "verstand", "verstanden"
+            Output: verstehen, [verstand, verstanden] = to understand
 
-Do NOT add extra grammatical information to verb lines.
-Do NOT add aspect, voice labels, or auxiliary forms.
-ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
+            Do NOT add extra grammatical information to verb lines.
+            Do NOT add aspect, voice labels, or auxiliary forms.
+            ONLY use: Infinitive, [Präteritum, Partizip II] = to ..., to ..., to ...
 
             For Adjectives:
 
