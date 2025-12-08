@@ -1896,6 +1896,8 @@ class VocabularyApp:
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
 
+        
+
     # === HELPER METHODS ===
 
     def extract_title_from_text(self, text_content):
@@ -2612,6 +2614,7 @@ class VocabularyApp:
         """Clear translation"""
         self.current_translated_file = None
         self.translation_textbox.delete(1.0, tk.END)
+        
 
     def sort_vocabulary(self):
         """Sort vocabulary and remove duplicates"""
