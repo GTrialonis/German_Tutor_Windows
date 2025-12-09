@@ -101,6 +101,11 @@ class VocabularyApp:
         
         # Evaluation tracking
         self.evaluated_questions = set()
+        # Reading comprehension state
+        self.reading_comprehension_active = False
+        self.reading_questions = []
+        self.current_reading_question_index = 0
+        self.reading_questions_generated = False
 
         # Create UI sections
         self.create_left_section()
@@ -135,6 +140,7 @@ class VocabularyApp:
             'SmallDarkOrange.TButton': {'background': '#AA5200', 'foreground': 'black'},
             'SmallWhite.TButton': {'background': '#7B7D7D', 'foreground': 'white'},
             'SmallGoldYellow.TButton': {'background': '#EBCE65', 'foreground': 'black'},
+            'SmallDarkRed.TButton': {'background': '#8B0000', 'foreground': 'white'},
             'SmallBlueish.TButton': {'background': '#5D6D7E', 'foreground': 'white'},
             'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'}        
             }
@@ -596,6 +602,203 @@ class VocabularyApp:
         self.current_question_index = 0
         
         messagebox.showinfo("Session Complete", "All questions have been evaluated!")
+
+    # === READING COMPREHENSION METHODS ===
+
+    def parse_reading_questions(self, questions_text):
+        """Parse generated reading comprehension questions into a list."""
+        questions = []
+        lines = questions_text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if (line.lower().startswith('frage') or line.lower().startswith('question')) and ':' in line:
+                q = line.split(':', 1)[1].strip()
+                if q:
+                    questions.append(q)
+            else:
+                # Accept bare lines as questions
+                questions.append(line)
+
+        if not questions:
+            questions = [
+                "Was ist die Hauptidee des Textes?",
+                "Nenne zwei wichtige Details aus dem Text.",
+                "Welche Schlussfolgerung kann man aus dem Text ziehen?"
+            ]
+
+        self.reading_questions = questions
+        self.current_reading_question_index = 0
+        self.reading_questions_generated = True
+
+    def start_reading_comprehension_session(self):
+        """Begin a reading-comprehension question-evaluation session."""
+        if not self.reading_questions:
+            messagebox.showwarning("No Questions", "No reading comprehension questions available.")
+            return
+
+        # If Translation Box already has content, ask user whether to save it
+        existing_translation = self.translation_textbox.get(1.0, tk.END).strip()
+        if existing_translation:
+            prompt = "Translation Box contains text. Save current content before replacing?"
+            choice = messagebox.askyesnocancel("Translation Box Not Empty", prompt, parent=self.root)
+            if choice is None:
+                return
+            elif choice:
+                try:
+                    self.save_translation()
+                except Exception as e:
+                    messagebox.showerror("Save Error", f"Failed to save translation: {e}", parent=self.root)
+
+        # Display questions in Translation Box
+        self.translation_textbox.delete(1.0, tk.END)
+        self.translation_textbox.insert(tk.END, "Answer these questions in German:\n\n")
+        for i, q in enumerate(self.reading_questions, 1):
+            self.translation_textbox.insert(tk.END, f"{i}. {q}\n")
+
+        # Instructions for the user
+        self.input_textbox.delete(1.0, tk.END)
+        self.input_textbox.insert(tk.END, "Type your answer to the current question here. Click 'Eval.Answer' after each answer.")
+
+        # Disable Prompt AI and enable Eval.Answer
+        if hasattr(self, 'prompt_ai_button'):
+            self.prompt_ai_button.config(state="disabled")
+        if hasattr(self, 'eval_answer_btn'):
+            self.eval_answer_btn.config(state="normal")
+
+        # Create an End Reading button near prompt controls so user can finish session
+        try:
+            parent = self.prompt_ai_button.master
+            if not hasattr(self, 'end_reading_btn') or not getattr(self, 'end_reading_btn'):
+                self.end_reading_btn = ttk.Button(parent, text="End Reading", style='SmallRed.TButton', command=self.end_reading_comprehension_session)
+                self.end_reading_btn.pack(side='left', padx=3, pady=3)
+        except Exception:
+            pass
+
+        self.reading_comprehension_active = True
+        self.evaluated_questions = set()
+
+    def handle_evaluation(self):
+        """Unified handler for Eval.Answer that dispatches to reading or listening flows."""
+        if getattr(self, 'reading_comprehension_active', False):
+            self.handle_reading_answer()
+        elif getattr(self, 'current_questions', None):
+            self.handle_listening_answer()
+        else:
+            # Default behaviour: send prompt to AI
+            self.prompt_inputbox()
+
+    def handle_reading_answer(self):
+        """Evaluate the user's answer for the current reading question."""
+        if not self.reading_questions:
+            self.prompt_inputbox()
+            return
+
+        idx = self.current_reading_question_index
+        user_answer = self.input_textbox.get(1.0, tk.END).strip()
+        if not user_answer:
+            messagebox.showwarning("No Answer", "Please type your answer before submitting.")
+            return
+
+        if idx in self.evaluated_questions:
+            messagebox.showinfo("Already Evaluated", "This question has already been evaluated. Please proceed to next question.")
+            return
+
+        # Build evaluation prompt using Study Text as context
+        current_question = self.reading_questions[idx]
+        study_text = self.study_textbox.get(1.0, tk.END).strip()
+
+        try:
+            prompt = f"""
+            Evaluate this German language answer in the context of the provided Study Text.
+
+            STUDY TEXT:
+            {study_text}
+
+            QUESTION: {current_question}
+            ANSWER: {user_answer}
+
+            Provide evaluation in this format:
+            SCORE: X/5
+            FEEDBACK: [Your feedback in German]
+            CORRECTION: [Corrected version if needed]
+            """
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+            )
+
+            evaluation = response.choices[0].message.content.strip()
+            self.display_evaluation(evaluation, user_answer, current_question)
+
+            # Mark evaluated and advance
+            self.evaluated_questions.add(idx)
+            self.current_reading_question_index += 1
+
+            if self.current_reading_question_index >= len(self.reading_questions):
+                self.end_reading_comprehension_session()
+            else:
+                self.show_next_question_popup()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not evaluate answer: {e}")
+
+    def show_next_question_popup(self):
+        """Modal popup informing user to proceed to next question and focusing input."""
+        popup = tk.Toplevel(self.root)
+        popup.transient(self.root)
+        popup.grab_set()
+        popup.title("Next Question")
+        popup.configure(bg="#222")
+        popup.geometry("300x120")
+
+        popup.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        tk.Label(popup, text=f"Proceed to question {self.current_reading_question_index + 1}", bg="#222", fg="white").pack(pady=(20, 10))
+        def on_next():
+            popup.destroy()
+            # Clear input box and focus for next answer
+            try:
+                self.input_textbox.delete(1.0, tk.END)
+                self.input_textbox.focus_set()
+            except Exception:
+                pass
+
+        ttk.Button(popup, text="Next", style='SmallGreen.TButton', command=on_next).pack(pady=5)
+
+    def end_reading_comprehension_session(self):
+        """End the reading comprehension session and restore UI state."""
+        # Disable Eval button, enable Prompt AI
+        try:
+            if hasattr(self, 'eval_answer_btn'):
+                self.eval_answer_btn.config(state="disabled")
+            if hasattr(self, 'prompt_ai_button'):
+                self.prompt_ai_button.config(state="normal")
+        except Exception:
+            pass
+
+        # Destroy End button if present
+        try:
+            if hasattr(self, 'end_reading_btn') and getattr(self, 'end_reading_btn'):
+                self.end_reading_btn.destroy()
+                self.end_reading_btn = None
+        except Exception:
+            pass
+
+        # Clear session state
+        self.reading_comprehension_active = False
+        self.reading_questions = []
+        self.current_reading_question_index = 0
+        self.reading_questions_generated = False
+        self.evaluated_questions = set()
+
+        messagebox.showinfo("Session Complete", "Reading comprehension session ended.")
 
     # === TEXT-TO-SPEECH METHODS ===
 
@@ -1079,7 +1282,7 @@ class VocabularyApp:
             left_frame,
             text="Eval.Answer",
             style='SmallGoldYellow.TButton',
-            command=self.handle_listening_answer,
+            command=self.handle_evaluation,  # unified handler for reading/listening
             state="disabled"
         )
         self.eval_answer_btn.pack(side='left', padx=(10, 3), pady=3)
@@ -1413,10 +1616,18 @@ class VocabularyApp:
 
     def prompt_inputbox(self):
         """Send user input to ChatGPT and display responses"""
+        # Refuse to send prompts while a comprehension session is active
+        if getattr(self, 'reading_comprehension_active', False) or getattr(self, 'current_questions', None):
+            try:
+                messagebox.showwarning("Busy", "A comprehension session is active. Use 'Eval.Answer' to evaluate answers.")
+            except Exception:
+                pass
+            return
+
         content = self.input_textbox.get(1.0, tk.END).strip()
         if not content:
             return
-        
+
         self.conversation_history.append({"role": "user", "content": content})
 
         try:
@@ -1887,16 +2098,12 @@ class VocabularyApp:
             )
             
             questions = response.choices[0].message.content.strip()
-            self.translation_textbox.delete(1.0, tk.END)
-            self.translation_textbox.insert(tk.END, questions)
-            self.input_textbox.delete(1.0, tk.END)
-            self.input_textbox.insert(tk.END, "Please answer the questions above in German. Type your answers here.")
-            self.current_comprehension_questions = questions
+            # Parse and start a reading comprehension session
+            self.parse_reading_questions(questions)
+            self.start_reading_comprehension_session()
             
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
-
-        
 
     # === HELPER METHODS ===
 
