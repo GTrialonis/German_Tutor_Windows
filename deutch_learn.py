@@ -2819,7 +2819,7 @@ class VocabularyApp:
 
     def clear_translation(self):
         """Clear translation"""
-        self.current_translated_file = None
+        self.current_translation_file = None
         self.translation_textbox.delete(1.0, tk.END)
         
 
