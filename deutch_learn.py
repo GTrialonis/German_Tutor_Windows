@@ -1429,6 +1429,12 @@ class VocabularyApp:
         frame.pack(fill=tk.X, padx=10, pady=(10, 0))
         
         label = tk.Label(frame, text=label_text, bg="#222", fg="gold", font=label_font)
+        # Keep a reference to the vocabulary label so we can update it with the file path
+        try:
+            if isinstance(label_text, str) and label_text.strip().startswith("Vocabulary (Current)"):
+                self.vocabulary_label = label
+        except Exception:
+            pass
         label.pack(anchor="w")
         
         if scrollbar:
@@ -1497,6 +1503,29 @@ class VocabularyApp:
                 ).pack(side='left', padx=(10, 3), pady=3)
         
         return textbox
+
+    def update_vocabulary_label_path(self):
+        """Update the Vocabulary label to include the current vocabulary file path (relative to Desktop)."""
+        if not hasattr(self, 'vocabulary_label'):
+            return
+
+        if self.current_voc_file:
+            try:
+                home = os.path.expanduser("~")
+                rel = os.path.relpath(self.current_voc_file, home)
+                # Normalize separators and ensure it starts with a backslash as requested
+                rel = rel.replace('/', '\\')
+                display = "\\" + rel
+            except Exception:
+                display = self.current_voc_file
+            new_text = f"Vocabulary (Current): {display}"
+        else:
+            new_text = "Vocabulary (Current):"
+
+        try:
+            self.vocabulary_label.config(text=new_text)
+        except Exception:
+            pass
 
     # === TEXT HIGHLIGHTING FUNCTIONALITY ===
 
@@ -1835,6 +1864,11 @@ class VocabularyApp:
 
         if filename.endswith("_VOC.txt") or "_VOC.txt" in filename:
             self.current_voc_file = filename
+            # Update the UI label to show the loaded file path (relative to Desktop)
+            try:
+                self.update_vocabulary_label_path()
+            except Exception:
+                pass
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.vocabulary_textbox.delete(1.0, tk.END)
@@ -1928,6 +1962,12 @@ class VocabularyApp:
                     self.current_voc_file = filename
                 else:
                     return  # User cancelled
+
+        # Update label if we have a current filename set
+        try:
+            self.update_vocabulary_label_path()
+        except Exception:
+            pass
 
         if filename:  # Now filename is guaranteed to be defined
             with open(filename, 'w', encoding='utf-8-sig') as file:
@@ -2862,6 +2902,11 @@ class VocabularyApp:
         """Clear vocabulary"""
         self.current_voc_file = None
         self.vocabulary_textbox.delete(1.0, tk.END)
+        # Update the vocabulary label to remove the path
+        try:
+            self.update_vocabulary_label_path()
+        except Exception:
+            pass
         self.current_voc_file = None
 
     def capture_text(self):
