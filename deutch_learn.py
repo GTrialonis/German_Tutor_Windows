@@ -1311,9 +1311,10 @@ class VocabularyApp:
         vocab_btn_frame.pack(pady=(0, 10))
 
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='SmallBlue.TButton', command=self.load_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="AI-create VOC\nfrom _TXT file", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="AI-create VOC", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="Sort-Remove\nDuplicates", style='SmallGoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="SORT", style='SmallGoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
                 command=self.show_vocabulary_search).pack(side=tk.RIGHT, padx=(0, 5))
@@ -2897,6 +2898,94 @@ class VocabularyApp:
             messagebox.showinfo("Sort Complete", 
                             f"Sorted vocabulary alphabetically\n"
                             f"Removed {duplicate_count} duplicate entries")
+
+    def fix_verbs(self):
+        """Use the AI to find German verbs in the current Vocabulary textbox,
+        convert them to the exact format required and replace the textbox contents
+        with the AI-corrected content.
+        """
+        content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+        if not content:
+            messagebox.showwarning("No Vocabulary", "The vocabulary box is empty.")
+            return
+
+        # Strategy:
+        # 1) Ask the AI which numbered lines are verbs.
+        # 2) Send only those verb lines to the AI to be fixed according to the CRITICAL VERB RULES.
+        # 3) Append the corrected verb lines to the non-verb lines (preserving original order of non-verbs).
+        try:
+            lines = content.splitlines()
+
+            rules = (
+                "CRITICAL VERB RULES (MUST FOLLOW):\n\n"
+                "- The part inside the square brackets MUST contain exactly TWO German forms:\n"
+                "  1. First: Präteritum (1st/3rd person singular),\n"
+                "  2. Second: Partizip II (past participle only, WITHOUT \"hat\"/\"ist\").\n\n"
+                "- Do NOT include any auxiliary verbs in the brackets.\n"
+                "- Always start each English translation with \"to\". Maximum three translations.\n"
+                "- If uncertain, still give your best guess for [Präteritum, Partizip II] but ALWAYS keep the same format.\n"
+                "- Examples and required output format: Infinitive, [Präteritum, Partizip II] = to ..., to ...\n\n"
+            )
+
+            # Step 1: Ask which lines are verbs
+            numbered = "\n".join(f"{i+1}: {ln}" for i, ln in enumerate(lines))
+            detect_prompt = (
+                "Identify which lines in the numbered vocabulary are German verbs (including separable/prefixed/modal verbs).\n"
+                + "Return ONLY the line numbers, one per line, in ascending order, no extra text.\n\n"
+                + "Numbered Vocabulary:\n"
+                + numbered
+            )
+
+            detect_resp = self.ask_chatgpt(detect_prompt, model_name="gpt-4o", temperature=0.0)
+
+            import re
+            verb_indices = []
+            for l in detect_resp.splitlines():
+                l = l.strip()
+                if not l:
+                    continue
+                m = re.match(r"^(\d+)$", l)
+                if m:
+                    idx = int(m.group(1)) - 1
+                    if 0 <= idx < len(lines):
+                        verb_indices.append(idx)
+
+            if not verb_indices:
+                messagebox.showinfo("Fix Verbs", "No verbs detected. No changes made.")
+                return
+
+            # Step 2: Collect verb lines and ask AI to correct them per rules
+            verb_lines = [lines[i] for i in verb_indices]
+            verbs_input = "\n".join(verb_lines)
+
+            correction_prompt = (
+                rules
+                + "You will be given only verb lines (one per line). For each input line produce a single corrected output line in the exact format:\n"
+                + "Infinitive, [Präteritum, Partizip II] = to ..., to ...\n"
+                + "Return exactly the same number of non-empty lines as inputs, in the same order, and NO other text.\n\n"
+                + "Verb lines:\n"
+                + verbs_input
+            )
+
+            correction_resp = self.ask_chatgpt(correction_prompt, model_name="gpt-4o", temperature=0.0)
+            corrected_verbs = [ln.strip() for ln in correction_resp.splitlines() if ln.strip()]
+
+            # Ensure we have at least as many corrected lines as inputs; otherwise try to salvage by taking first N non-empty
+            if len(corrected_verbs) < len(verb_lines):
+                # fallback: take first len(verb_lines) non-empty lines
+                corrected_verbs = corrected_verbs[:len(verb_lines)]
+
+            # Step 3: Build merged output: non-verb lines (in original order) followed by corrected verbs
+            non_verb_lines = [lines[i] for i in range(len(lines)) if i not in verb_indices]
+            final_lines = non_verb_lines + corrected_verbs
+
+            merged = "\n".join(final_lines) + ("\n" if final_lines and not final_lines[-1].endswith("\n") else "")
+            self.vocabulary_textbox.delete(1.0, tk.END)
+            self.vocabulary_textbox.insert(tk.END, merged)
+            messagebox.showinfo("Fix Verbs", "Verbs processed and appended to the vocabulary.")
+
+        except Exception as e:
+            messagebox.showerror("Fix Verbs Error", f"An error occurred while fixing verbs: {e}")
 
     def clear_vocabulary(self):
         """Clear vocabulary"""
