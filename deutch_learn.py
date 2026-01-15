@@ -62,7 +62,8 @@ class VocabularyApp:
         self.current_language = "german"
         self.current_voc_file = None
         self.current_study_file = None
-        self.current_translated_file = None
+        self.current_translation_file = None
+        self.translation_content_cleared = False  # Track if translation content was cleared
         self.current_example_sentences_file = None
         self.current_ai_responses_file = None
         self.score = 0
@@ -2815,7 +2816,8 @@ class VocabularyApp:
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
 
         if filename.endswith("_TRA.txt") or "_TRA.txt" in filename:
-            self.current_translated_file = filename  # Save the loaded filename
+            self.current_translation_file = filename  # Save the loaded filename
+            self.translation_content_cleared = False  # Reset flag when file is loaded
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
                 self.translation_textbox.insert(tk.END, content)
@@ -2829,38 +2831,75 @@ class VocabularyApp:
             return
 
     def save_translation(self):
-        """Save translation back to the original file if known, otherwise use filedialog"""
-        filename = None  # Initialize filename to None
+        """Save translation to file.
         
+        Behavior:
+        - If a translation file is loaded and content is NOT cleared, save to that file without prompting
+        - If content is cleared/deleted and new content is added, prompt for a new filename
+        - Otherwise, prompt for a filename
+        """
+        content = self.translation_textbox.get(1.0, tk.END).strip()
+        
+        # If no content, don't save
+        if not content:
+            messagebox.showwarning("No Content", "Translation box is empty. Nothing to save.")
+            return
+        
+        # Check if we have a known file AND the content hasn't been cleared
         if hasattr(self, 'current_translation_file') and self.current_translation_file:
-            # Save to the known file
-            try:
-                content = self.translation_textbox.get(1.0, tk.END).strip()
-                with open(self.current_translation_file, 'w', encoding='utf-8') as file:
-                    file.write(content)
-                messagebox.showinfo("Saved", f"Translation saved to:\n{self.current_translation_file}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
-        else:
-            # Fall back to filedialog if no known file
-            filename = filedialog.asksaveasfilename(
-                defaultextension=".txt",
-                filetypes=[("Text files", "*.txt")],
-                initialfile="translation.txt"
-            )
-            if filename:
-                try:
-                    content = self.translation_textbox.get(1.0, tk.END).strip()
-                    with open(filename, 'w', encoding='utf-8') as file:
-                        file.write(content)
+            # Check if content was cleared by looking at the flag
+            if getattr(self, 'translation_content_cleared', False):
+                # Content was cleared, so prompt for a new filename
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt")],
+                    initialfile="translation.txt"
+                )
+                if filename:
+                    nwext = os.path.splitext(filename)[0]
+                    if '_TRA' not in filename:
+                        filename = nwext + '_TRA.txt'
                     self.current_translation_file = filename
-                    messagebox.showinfo("Saved", f"Translation saved to:\n{filename}")
+                    self.translation_content_cleared = False  # Reset flag
+                    try:
+                        with open(filename, 'w', encoding='utf-8-sig') as file:
+                            file.write(content)
+                        messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+                return
+            else:
+                # Content not cleared, save to the known file
+                try:
+                    with open(self.current_translation_file, 'w', encoding='utf-8-sig') as file:
+                        file.write(content)
+                    messagebox.showinfo("Success", f"Translation saved to:\n{self.current_translation_file}")
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+                return
+        
+        # No known file, prompt for filename
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt")],
+            initialfile="translation.txt"
+        )
+        if filename:
+            nwext = os.path.splitext(filename)[0]
+            if '_TRA' not in filename:
+                filename = nwext + '_TRA.txt'
+            self.current_translation_file = filename
+            self.translation_content_cleared = False  # Reset flag
+            try:
+                with open(filename, 'w', encoding='utf-8-sig') as file:
+                    file.write(content)
+                messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
 
     def clear_translation(self):
         """Clear translation"""
-        self.current_translation_file = None
+        self.translation_content_cleared = True  # Set flag to indicate content was cleared
         self.translation_textbox.delete(1.0, tk.END)
         
 
