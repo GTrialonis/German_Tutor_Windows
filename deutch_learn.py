@@ -2718,7 +2718,7 @@ class VocabularyApp:
             self.clear_vocabulary_highlights()
             self.search_matches = []
             nav_frame.pack_forget()  # Hide navigation
-            messagebox.showinfo("Cleared", "All highlights cleared")
+            # messagebox.showinfo("Cleared", "All highlights cleared")
         
         def new_entry():
             """Clear the input field to search for new word"""
