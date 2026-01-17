@@ -12,6 +12,7 @@ from gtts import gTTS
 import pygame
 import tempfile
 import time
+import re
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -617,10 +618,14 @@ class VocabularyApp:
             if (line.lower().startswith('frage') or line.lower().startswith('question')) and ':' in line:
                 q = line.split(':', 1)[1].strip()
                 if q:
+                    # Remove leading numbers like "1. ", "2. ", etc.
+                    q = re.sub(r'^\d+\.\s*', '', q)
                     questions.append(q)
             else:
-                # Accept bare lines as questions
-                questions.append(line)
+                # Accept bare lines as questions, but remove leading numbers
+                q = re.sub(r'^\d+\.\s*', '', line)
+                if q:
+                    questions.append(q)
 
         if not questions:
             questions = [
