@@ -1319,7 +1319,7 @@ class VocabularyApp:
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='SmallBlue.TButton', command=self.load_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="AI-create VOC", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="SORT", style='SmallGoldBrown.TButton', command=self.sort_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="Beautify", style='SmallGoldBrown.TButton', command=self.beautify_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
@@ -1843,7 +1843,7 @@ class VocabularyApp:
 
             Format: German Word = translation1, translation2, translation3
 
-            Example: oft = often, frequently"""
+            Example: oft = often, frequently."""
 
             response = client.chat.completions.create(model="gpt-4o",
             messages=[
@@ -2447,7 +2447,8 @@ class VocabularyApp:
 
         try:
             examples = self.ask_chatgpt(full_prompt, model_name="gpt-4o", temperature=0.8)
-            self.example_sentences_textbox.insert(tk.END, "\n" + examples)
+            # Insert examples without a leading blank line
+            self.example_sentences_textbox.insert(tk.END, examples)
 
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Examples Error", f"An error occurred: {e}")
@@ -2908,9 +2909,11 @@ class VocabularyApp:
         self.translation_textbox.delete(1.0, tk.END)
         
 
-    def sort_vocabulary(self):
-        """Sort vocabulary and remove duplicates"""
-       # Get content from the textbox
+    def beautify_vocabulary(self):
+        """Beautify vocabulary: remove duplicates and remove preceding numbers"""
+        import re
+        
+        # Get content from the textbox
         content = self.vocabulary_textbox.get(1.0, tk.END)
         
         # Process the content to remove duplicates while preserving order
@@ -2922,26 +2925,30 @@ class VocabularyApp:
             stripped_line = line.strip()
             if not stripped_line:
                 continue
+            
+            # Remove preceding numbers (e.g., "1. ", "23. ")
+            # This regex removes any number followed by a period and optional whitespace at the start
+            cleaned_line = re.sub(r'^\d+\.\s*', '', stripped_line)
                 
             # Only add if we haven't seen this line before
-            if stripped_line not in seen:
-                seen.add(stripped_line)
-                unique_lines.append(stripped_line)
+            if cleaned_line not in seen:
+                seen.add(cleaned_line)
+                unique_lines.append(cleaned_line)
         
-        # Sort the unique lines alphabetically (case-insensitive)
-        sorted_lines = sorted(unique_lines, key=lambda x: x.split('=')[0].strip().lower())
-        
-        # Join with newlines and update the textbox
-        sorted_content = '\n'.join(sorted_lines) + '\n'  # Add final newline
+        # Join with newlines and update the textbox (preserve original order, don't sort)
+        beautified_content = '\n'.join(unique_lines) + '\n'  # Add final newline
         self.vocabulary_textbox.delete(1.0, tk.END)
-        self.vocabulary_textbox.insert(tk.END, sorted_content)
+        self.vocabulary_textbox.insert(tk.END, beautified_content)
         
         # Show how many duplicates were removed
         duplicate_count = len(content.splitlines()) - len(unique_lines)
         if duplicate_count > 0:
-            messagebox.showinfo("Sort Complete", 
-                            f"Sorted vocabulary alphabetically\n"
-                            f"Removed {duplicate_count} duplicate entries")
+            messagebox.showinfo("Beautify Complete", 
+                            f"Removed {duplicate_count} duplicate entries\n"
+                            f"Removed preceding numbers from entries")
+        else:
+            messagebox.showinfo("Beautify Complete", 
+                            f"Removed preceding numbers from entries")
 
     def fix_verbs(self):
         """Use the AI to find German verbs in the current Vocabulary textbox,
