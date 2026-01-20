@@ -42,6 +42,49 @@ def configure_openai():
         messagebox.showerror("API Configuration Error", f"Failed to configure OpenAI API: {e}")
         exit()
 
+class Tooltip:
+    """Simple tooltip class for tkinter widgets."""
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        widget.bind("<Enter>", self.show_tooltip)
+        widget.bind("<Leave>", self.hide_tooltip)
+    
+    def show_tooltip(self, event=None):
+        """Display the tooltip."""
+        if self.tooltip:
+            return
+        
+        # Create tooltip window
+        self.tooltip = tk.Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        
+        # Position tooltip near cursor
+        x = self.widget.winfo_rootx() + 10
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        
+        # Create label with text
+        label = tk.Label(
+            self.tooltip,
+            text=self.text,
+            background="#FFFFE0",
+            foreground="#000000",
+            relief=tk.SOLID,
+            borderwidth=1,
+            font=("Arial", 9),
+            padx=5,
+            pady=3
+        )
+        label.pack()
+    
+    def hide_tooltip(self, event=None):
+        """Hide the tooltip."""
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
+
 class VocabularyApp:
     def __init__(self, root):
         self.root = root
@@ -1319,8 +1362,12 @@ class VocabularyApp:
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='SmallBlue.TButton', command=self.load_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="AI-create VOC", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="Beautify", style='SmallGoldBrown.TButton', command=self.beautify_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs).pack(pady=2)
+        beautify_btn = ttk.Button(vocab_btn_frame, text="Beautify", style='SmallGoldBrown.TButton', command=self.beautify_vocabulary)
+        beautify_btn.pack(pady=2)
+        Tooltip(beautify_btn, "Click to remove preceding numbers and duplicate entries.")
+        fix_verbs_btn = ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs)
+        fix_verbs_btn.pack(pady=2)
+        Tooltip(fix_verbs_btn, "Find all verbs and format them as: infinitive, Präteritum, Partizip II. Append them at the end of the vocabulary.")
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2)
         ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
                 command=self.show_vocabulary_search).pack(side=tk.RIGHT, padx=(0, 5))
@@ -2910,7 +2957,7 @@ class VocabularyApp:
         
 
     def beautify_vocabulary(self):
-        """Beautify vocabulary: remove duplicates and remove preceding numbers"""
+        """Beautify vocabulary: remove preceding numbers and duplicates"""
         import re
         
         # Get content from the textbox
