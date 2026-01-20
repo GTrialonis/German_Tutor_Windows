@@ -1360,28 +1360,36 @@ class VocabularyApp:
         vocab_btn_frame.pack(pady=(0, 10))
 
         ttk.Button(vocab_btn_frame, text="LOAD-VOC", style='SmallBlue.TButton', command=self.load_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="AI-create VOC", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary()).pack(pady=2)
+        ai_create_voc_btn = ttk.Button(vocab_btn_frame, text="AI-create VOC", style='SmallDarkPurple.TButton', command=lambda: self.create_vocabulary())
+        ai_create_voc_btn.pack(pady=2)
+        Tooltip(ai_create_voc_btn, "Click to let AI create a vocabulary from a -VOC file, then use buttons 'Beautify' and 'Fix Verbs' if necesssary.")
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
         beautify_btn = ttk.Button(vocab_btn_frame, text="Beautify", style='SmallGoldBrown.TButton', command=self.beautify_vocabulary)
         beautify_btn.pack(pady=2)
-        Tooltip(beautify_btn, "Click to remove preceding numbers and duplicate entries.")
+        Tooltip(beautify_btn, "Click to remove preceding numbers, if any, and duplicate entries.")
         fix_verbs_btn = ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs)
         fix_verbs_btn.pack(pady=2)
         Tooltip(fix_verbs_btn, "Find all verbs and format them as: infinitive, Präteritum, Partizip II. Append them at the end of the vocabulary.")
         ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2)
-        ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
-                command=self.show_vocabulary_search).pack(side=tk.RIGHT, padx=(0, 5))
-
+        search_vocab_btn = ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
+                command=self.show_vocabulary_search)
+        search_vocab_btn.pack(side=tk.RIGHT, padx=(0, 5))
+        Tooltip(search_vocab_btn, "Load a vocabulary file (_VOC.txt) to search its contents.")
+        
         # Group 2: Study Text Buttons
         study_btn_frame = tk.Frame(middle_frame, bg="#222")
         study_btn_frame.pack(pady=(2, 2)) # debug (15 replaced by 5)
 
         ttk.Button(study_btn_frame, text="LOAD-TXT", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text).pack(pady=2)
+        copy_txt_btn = ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text)
+        copy_txt_btn.pack(pady=2)
+        Tooltip(copy_txt_btn, "Click to copy the entire text.")
         ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=2)
         ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
-        ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='SmallLightPurple.TButton', command=self.capture_text).pack(pady=2)
+        free_hand_trans_btn = ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='SmallLightPurple.TButton', command=self.capture_text)
+        free_hand_trans_btn.pack(pady=2)
+        Tooltip(free_hand_trans_btn, "First load German text in the Study Text Box, then click button to translate into English.")
         ttk.Button(study_btn_frame, text="  LISTEN to\nthe Study Text", style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=2)
 
         # Group 3: Translation Buttons
