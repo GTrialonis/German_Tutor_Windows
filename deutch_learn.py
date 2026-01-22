@@ -13,6 +13,8 @@ import pygame
 import tempfile
 import time
 import re
+import json
+from datetime import datetime
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -132,6 +134,12 @@ class VocabularyApp:
         self.total_listening_questions = 0
         self.listening_dir = "list_compr_files"
         os.makedirs(self.listening_dir, exist_ok=True)
+
+        # Reading session progress variables
+        self.reading_session_dir = "reading_session_progress"
+        os.makedirs(self.reading_session_dir, exist_ok=True)
+        self.current_reading_session_file = None
+        self.current_study_text_for_session = ""
 
         # Text-to-speech variables
         self.is_reading = False
@@ -687,6 +695,9 @@ class VocabularyApp:
             messagebox.showwarning("No Questions", "No reading comprehension questions available.")
             return
 
+        # Store the current study text for session saving
+        self.current_study_text_for_session = self.study_textbox.get(1.0, tk.END).strip()
+
         # If Translation Box already has content, ask user whether to save it
         existing_translation = self.translation_textbox.get(1.0, tk.END).strip()
         if existing_translation:
@@ -823,6 +834,11 @@ class VocabularyApp:
 
     def end_reading_comprehension_session(self):
         """End the reading comprehension session and restore UI state."""
+        # Save progress before clearing if session had any activity
+        if self.reading_comprehension_active and (self.reading_questions or self.evaluated_questions):
+            self.save_reading_session()
+            messagebox.showinfo("Progress Saved", "Your progress has been saved. You can resume it later.")
+
         # Disable Eval button, enable Prompt AI
         try:
             if hasattr(self, 'eval_answer_btn'):
@@ -848,6 +864,140 @@ class VocabularyApp:
         self.evaluated_questions = set()
 
         messagebox.showinfo("Session Complete", "Reading comprehension session ended.")
+
+    # === READING SESSION PERSISTENCE METHODS ===
+
+    def save_reading_session(self):
+        """Save current reading comprehension session to a JSON file."""
+        try:
+            # Get user answers from input box
+            user_answers = {}
+            for idx in self.evaluated_questions:
+                if idx < len(self.reading_questions):
+                    # Store the question and mark it as evaluated
+                    user_answers[str(idx)] = {"evaluated": True}
+
+            session_data = {
+                "timestamp": datetime.now().isoformat(),
+                "study_text": self.current_study_text_for_session,
+                "questions": self.reading_questions,
+                "evaluated_question_indices": sorted(list(self.evaluated_questions)),
+                "current_question_index": self.current_reading_question_index,
+                "user_answers": user_answers
+            }
+
+            # Create filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"session_{timestamp}.json"
+            filepath = os.path.join(self.reading_session_dir, filename)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(session_data, f, ensure_ascii=False, indent=2)
+
+            self.current_reading_session_file = filepath
+            print(f"Reading session saved to {filepath}")
+
+        except Exception as e:
+            print(f"Error saving reading session: {e}")
+
+    def load_reading_session(self, filepath):
+        """Load a saved reading comprehension session from JSON file."""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                session_data = json.load(f)
+
+            # Restore session state
+            self.current_study_text_for_session = session_data.get("study_text", "")
+            self.reading_questions = session_data.get("questions", [])
+            self.current_reading_question_index = session_data.get("current_question_index", 0)
+            self.evaluated_questions = set(session_data.get("evaluated_question_indices", []))
+            self.current_reading_session_file = filepath
+
+            return True
+
+        except Exception as e:
+            print(f"Error loading reading session: {e}")
+            messagebox.showerror("Load Error", f"Could not load saved session: {e}")
+            return False
+
+    def has_saved_session(self):
+        """Check if a saved reading session exists."""
+        try:
+            files = os.listdir(self.reading_session_dir)
+            json_files = [f for f in files if f.endswith('.json')]
+            return len(json_files) > 0
+        except Exception:
+            return False
+
+    def get_latest_saved_session(self):
+        """Get the path to the most recent saved session file."""
+        try:
+            files = os.listdir(self.reading_session_dir)
+            json_files = [f for f in files if f.endswith('.json')]
+            if not json_files:
+                return None
+            json_files.sort(reverse=True)  # Most recent first
+            return os.path.join(self.reading_session_dir, json_files[0])
+        except Exception:
+            return None
+
+    def resume_reading_session(self):
+        """Resume a saved reading comprehension session."""
+        latest_session = self.get_latest_saved_session()
+
+        if not latest_session:
+            messagebox.showwarning("No Session", "No saved reading session found.")
+            return
+
+        # Load the session data to display info
+        try:
+            with open(latest_session, 'r', encoding='utf-8') as f:
+                session_data = json.load(f)
+
+            timestamp = session_data.get("timestamp", "Unknown")
+            evaluated_count = len(session_data.get("evaluated_question_indices", []))
+            total_questions = len(session_data.get("questions", []))
+            current_idx = session_data.get("current_question_index", 0)
+
+            # Show confirmation dialog
+            info_msg = (f"Resume saved session?\n\n"
+                       f"Saved: {timestamp}\n"
+                       f"Progress: {evaluated_count}/{total_questions} questions answered\n"
+                       f"Next question: #{current_idx + 1}")
+
+            if messagebox.askyesno("Resume Session", info_msg, parent=self.root):
+                if self.load_reading_session(latest_session):
+                    # Update study text box with the saved study text
+                    self.study_textbox.delete(1.0, tk.END)
+                    self.study_textbox.insert(tk.END, self.current_study_text_for_session)
+
+                    # Restore the reading comprehension UI state
+                    self.start_reading_comprehension_session()
+                    messagebox.showinfo("Session Resumed", "Your reading comprehension session has been restored.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not resume session: {e}")
+
+    def clear_saved_session(self):
+        """Clear the most recent saved session."""
+        latest_session = self.get_latest_saved_session()
+
+        if not latest_session:
+            messagebox.showwarning("No Session", "No saved reading session found to clear.")
+            return
+
+        try:
+            with open(latest_session, 'r', encoding='utf-8') as f:
+                session_data = json.load(f)
+
+            timestamp = session_data.get("timestamp", "Unknown")
+
+            if messagebox.askyesno("Clear Session", f"Delete saved session from {timestamp}?", parent=self.root):
+                os.remove(latest_session)
+                messagebox.showinfo("Cleared", "Saved session has been deleted.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not clear session: {e}")
 
     # === TEXT-TO-SPEECH METHODS ===
 
@@ -1545,6 +1695,20 @@ class VocabularyApp:
                     style='SmallPurple.TButton',
                     command=self.generate_comprehension_questions
                 ).pack(side='left', padx=(15, 3), pady=3)
+                
+                ttk.Button(
+                    button_frame,
+                    text="Resume Reading",
+                    style='SmallDarkBlue.TButton',
+                    command=self.resume_reading_session
+                ).pack(side='left', padx=3, pady=3)
+                
+                ttk.Button(
+                    button_frame,
+                    text="Clear Saved Session",
+                    style='SmallDarkRed.TButton',
+                    command=self.clear_saved_session
+                ).pack(side='left', padx=3, pady=3)
             
             
             if label_text == "Study Text Box:":
