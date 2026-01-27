@@ -2532,8 +2532,9 @@ class VocabularyApp:
             "Try to be creative and use different contexts.",
             "Give fresh and varied examples, avoid common textbook ones.",
             "Use different sentence structures or scenarios than before.",
-            "Pick examples from different domains like travel, food, or work.",
+            "Pick examples from different domains like travel, food, work, politics, science, fiction, etc.",
             "Avoid repeating any previous examples."
+            "Your sentences should make sence in real life contexts."
         ]
         variation_hint = random.choice(variation_hints)
 
