@@ -3082,7 +3082,7 @@ class VocabularyApp:
                 filename = filedialog.asksaveasfilename(
                     defaultextension=".txt",
                     filetypes=[("Text files", "*.txt")],
-                    initialfile="translation.txt"
+                    initialfile=""
                 )
                 if filename:
                     nwext = os.path.splitext(filename)[0]
@@ -3111,7 +3111,7 @@ class VocabularyApp:
         filename = filedialog.asksaveasfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt")],
-            initialfile="translation.txt"
+            initialfile=""
         )
         if filename:
             nwext = os.path.splitext(filename)[0]
