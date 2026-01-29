@@ -1552,13 +1552,16 @@ class VocabularyApp:
         ttk.Button(translation_btn_frame, text="NOTES", style='SmallGoldBrown.TButton', command=self.add_notes).pack(pady=2)
         
         # Group 4: AI Response Buttons
+        ai_responses_label = tk.Label(middle_frame, text="AI Responses", bg="#222", fg="gold", font=("Arial", 12, "bold"))
+        ai_responses_label.pack(pady=(40, 5))
+        
         ai_responses_middle_btn_frame = tk.Frame(middle_frame, bg="#222")
-        ai_responses_middle_btn_frame.pack(pady=(40, 0))
+        ai_responses_middle_btn_frame.pack(pady=(0, 0))
 
-        ttk.Button(ai_responses_middle_btn_frame, text="Save AI\nResponses", style='SmallDarkPurple.TButton', command=self.save_ai_responses).pack(pady=2)
-        ttk.Button(ai_responses_middle_btn_frame, text="Append AI\nResponses", style='SmallDarkPurple.TButton', command=self.append_ai_responses_to_file).pack(pady=2)
-        ttk.Button(ai_responses_middle_btn_frame, text="Copy AI \nResponses", style='SmallDarkPurple.TButton', command=self.copy_ai_responses).pack(pady=2)
-        ttk.Button(ai_responses_middle_btn_frame, text="Clear AI\nResponses", style='SmallRed.TButton', command=self.clear_ai_responses_textbox).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Save", style='SmallDarkPurple.TButton', command=self.save_ai_responses).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Append", style='SmallDarkPurple.TButton', command=self.append_ai_responses_to_file).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Copy", style='SmallDarkPurple.TButton', command=self.copy_ai_responses).pack(pady=2)
+        ttk.Button(ai_responses_middle_btn_frame, text="Clear", style='SmallRed.TButton', command=self.clear_ai_responses_textbox).pack(pady=2)
 
     def create_right_section(self):
         """Create the right section of the UI"""

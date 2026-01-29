@@ -24,6 +24,9 @@ listening-instructions.txt
 # Listening comprehension files
 list_compr_files/
 
+# reading session progress
+reading_session_progress/
+
 # For me
 remarks-for-listening-compr.txt
 
