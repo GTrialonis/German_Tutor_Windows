@@ -1569,7 +1569,7 @@ class VocabularyApp:
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=5)
 
         # Example Sentences
-        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary, also Load and Append examples", True, height=6)
+        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary", True, height=6)
 
         # New Input Box for Glosbe Search
         self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
@@ -1963,7 +1963,10 @@ class VocabularyApp:
 
             Filter Stopwords: Create a list of all words from the text, maintaining their original order of appearance. From this list, remove any word that appears in the stopword list below. Then, create a final unique list, keeping only the first occurrence of each word.
 
-            Stopword List: der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, er, sie, es, wir, ihr, Sie, in, an, auf, unter, über, vor, hinter, neben, zwischen, mit, nach, bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich, uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird, Frühling, Sommer, Herbst, Winter
+            Stopword List: Oh, nein, ya, oder, der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, er, sie, es, wir, ihr, Sie, in, an, auf, 
+            unter, über, vor, hinter, neben, zwischen, mit, nach, bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich, uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird, 
+            Frühling, Sommer, Herbst, Winter, Wasser, Feuer, Erde, Luft, Himmel, Sonne, Mond, Stern, Tag, Nacht, Zeit, Jahr, heute, morgen, gestern, immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht 
+            gute, großer, kleine, schön, alt, jung, neu, lang, kurz, schnell, langsam, hoch, niedrig, warm, kalt.
 
             Lemmatize and Analyze: For each unique word in the ordered list, determine its base form (lemma) and its part of speech (noun, verb, adjective, adverb, etc.).
 
