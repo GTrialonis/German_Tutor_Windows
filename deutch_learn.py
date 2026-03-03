@@ -1696,7 +1696,7 @@ class VocabularyApp:
                     button_frame,
                     text="READING Comprehension",
                     style='SmallPurple.TButton',
-                    command=self.generate_comprehension_questions
+                    command=self.show_reading_comprehension_options
                 ).pack(side='left', padx=(15, 3), pady=3)
                 
                 ttk.Button(
@@ -2342,12 +2342,101 @@ class VocabularyApp:
 
     # === READING COMPREHENSION ===
 
-    def generate_comprehension_questions(self):
-        """Generate comprehension questions based on study text"""
-        study_text = self.study_textbox.get(1.0, tk.END).strip()
+    def show_reading_comprehension_options(self):
+        """Show popup with options to read entire text or from clipboard"""
+        options_window = tk.Toplevel(self.root)
+        options_window.title("Reading Comprehension Options")
+        options_window.configure(bg="#222")
+        options_window.geometry("450x200")
         
-        if not study_text:
-            messagebox.showwarning("No Text", "Please load some text into the Study Text Box first.")
+        # Center the window
+        options_window.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (options_window.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (options_window.winfo_height() // 2)
+        options_window.geometry(f"+{x}+{y}")
+        
+        # Instructions label
+        tk.Label(
+            options_window,
+            text="Choose which text to use for comprehension questions:",
+            bg="#222",
+            fg="white",
+            font=("Arial", 11)
+        ).pack(pady=15)
+        
+        # Button frame
+        button_frame = tk.Frame(options_window, bg="#222")
+        button_frame.pack(pady=20)
+        
+        # Button 1: Read entire text (warm peach pastel)
+        btn_entire = tk.Button(
+            button_frame,
+            text="Read the\nEntire Text",
+            bg="#FFDCC1",
+            fg="#333333",
+            font=("Arial", 11, "bold"),
+            width=15,
+            height=3,
+            cursor="hand2",
+            activebackground="#FFD4B4",
+            activeforeground="#333333",
+            command=lambda: self._handle_reading_selection("entire", options_window)
+        )
+        btn_entire.pack(side=tk.LEFT, padx=10)
+        
+        # Button 2: Read from clipboard (warm coral pastel)
+        btn_clipboard = tk.Button(
+            button_frame,
+            text="Read from\nClipboard",
+            bg="#FFCCBB",
+            fg="#333333",
+            font=("Arial", 11, "bold"),
+            width=15,
+            height=3,
+            cursor="hand2",
+            activebackground="#FFBAAA",
+            activeforeground="#333333",
+            command=lambda: self._handle_reading_selection("clipboard", options_window)
+        )
+        btn_clipboard.pack(side=tk.LEFT, padx=10)
+        
+        # Cancel button
+        tk.Button(
+            options_window,
+            text="Cancel",
+            bg="#666666",
+            fg="white",
+            font=("Arial", 10),
+            width=15,
+            cursor="hand2",
+            command=options_window.destroy
+        ).pack(pady=15)
+
+    def _handle_reading_selection(self, source, popup_window):
+        """Handle reading comprehension based on selected source"""
+        popup_window.destroy()
+        
+        if source == "entire":
+            text = self.study_textbox.get(1.0, tk.END).strip()
+            if not text:
+                messagebox.showwarning("No Text", "Please load some text into the Study Text Box first.")
+                return
+        elif source == "clipboard":
+            try:
+                text = self.root.clipboard_get().strip()
+                if not text:
+                    messagebox.showwarning("Empty Clipboard", "The clipboard is empty. Please copy some text first.")
+                    return
+            except Exception as e:
+                messagebox.showerror("Clipboard Error", f"Could not read from clipboard: {e}")
+                return
+        
+        self.generate_comprehension_questions(text)
+
+    def generate_comprehension_questions(self, text):
+        """Generate comprehension questions based on provided text"""
+        if not text:
+            messagebox.showwarning("No Text", "No text provided for comprehension questions.")
             return
         
         prompt = f"""
@@ -2355,7 +2444,7 @@ class VocabularyApp:
         The questions should test understanding of the text and should be appropriate for a German language learner.
         
         Text:
-        {study_text}
+        {text}
         
         Please provide only the questions, numbered, without any additional text or explanations.
         """
