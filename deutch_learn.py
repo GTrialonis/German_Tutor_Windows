@@ -1954,74 +1954,20 @@ class VocabularyApp:
 
             prompt = """You are a German-English linguistic analysis tool. Your task is to process a German text, filter it based on a custom stopword list, and then generate a formatted vocabulary list with specific grammatical information and English translations.
 
-            Objective:
-            Analyze the provided German text file to create a unique vocabulary list. The order of the words in the final output must match the order in which the first instance of each word appeared in the source text. Each entry in the list must be formatted according to its part of speech (noun, verb, adjective, or other) and translated into English.
-
-            Processing Workflow:
-
-            Tokenize and Normalize: Read the entire text. Break it down into individual words (tokens). Treat all punctuation (e.g., , . ! ? ; : " ') as delimiters and remove it from the words.
-
-            Filter Stopwords: Create a list of all words from the text, maintaining their original order of appearance. From this list, remove any word that appears in the stopword list below. Then, create a final unique list, keeping only the first occurrence of each word.
-
-            Stopword List: Oh, nein, ya, oder, der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, er, sie, es, wir, ihr, Sie, in, an, auf, 
-            unter, über, vor, hinter, neben, zwischen, mit, nach, bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich, uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird, 
-            Frühling, Sommer, Herbst, Winter, Wasser, Feuer, Erde, Luft, Himmel, Sonne, Mond, Stern, Tag, Nacht, Zeit, Jahr, heute, morgen, gestern, immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht 
-            gute, großer, kleine, schön, alt, jung, neu, lang, kurz, schnell, langsam, hoch, niedrig, warm, kalt.
-
-            Lemmatize and Analyze: For each unique word in the ordered list, determine its base form (lemma) and its part of speech (noun, verb, adjective, adverb, etc.).
-
-            Format and Translate: Generate the final output list. Follow the output formatting rules below precisely.
-
-            Output Formatting Rules:
-
-            General:
-
-            DO NOT precede any entry with markup, numbers, bullets, hyphens, or any other characters. Each entry begins with the German word itself.
-
-            Each entry must be on a new line.
-
-            Provide a maximum of THREE English translations for each word.
-
-            Do not sort the final list. The order of words must correspond to the order in which their first instance appeared in the original text.
-
-            For Nouns:
-
-            From any form of a noun found in the text (e.g., "Buches"), identify its SINGULAR, NOMINATIVE form.
-
-            Format: SINGULAR Form, Article, [Plural Form, Plural Article] = translation1, translation2, translation3
-
-            Example: Buch, das, [Bücher, die] = book, volume, ledger
-
-            ================================================
-            *** VERBS — VERY IMPORTANT ***
-            ================================================
-
-            From ANY verb found in the text, REGARDLESS of its form, you MUST display it in the vocabulary list as follows:
-            infinitiv, [Präteritum, Partizip II, without auxiliary] = to translation1, to translation2, to translation3
-
-            EXAMPLES: Suppose you encounter the following verb forms in the text: 
-            "spricht"; you output: sprechen, [sprach, gesprochen] = to speak, to talk
-            "sprach"; you output: sprechen, [sprach, gesprochen] = to speak, to talk
-            similarly with "gesprochen".
-            
-            you encounter: "gehe", "ging", or "gegangen";  you output: gehen, [ging, gegangen] = to go, to walk
-            similarly with all other German verbs; you output the Infinitiv, [Präteritum, Partizip II] = to translation1, to translation2, to translation3
-            ---------------------------------------
-            For Adjectives:
-
-            From any form of an adjective, identify its positive (base) form.
-
-            Format: Positive Form, [Comparative Form, Superlative Form] = translation1, translation2, translation3
-
-            Example: schnell, [schneller, schnellsten] = fast, quick, rapid
-
-            For Adverbs and All Other Word Types:
+            Give me a vocabulary list with English translations (max. 3) from the the German text.
+Rules: 
+1) All output should be in plain text, i.e. list entries should not be preceded by numbers, asterisks, bullets, etc.
+2) for any verb form or type you encounter, return the three basic forms in German: Infinitiv, [Präteritum, Partizip II] = translation1, translation2, translation3, for example: if you encounter 'sprichst' or 'sprachen' or any other form of the same verb, you output: sprechen, [sprach, gesprochen] = speak, say, relate.
+3) Nouns: follow this example for any noun form or case you encounter:: Buch, das, [Bücher, die] = book, volume, ledger
+4) Adjectives: From any form of an adjective, identify its positive (base) form and follow this example: schnell, [schneller, schnellsten] = fast, quick, rapid.
+5) For Adverbs and All Other Word Types:
 
             Display the word in its base/dictionary form.
 
             Format: German Word = translation1, translation2, translation3
 
-            Example: oft = often, frequently."""
+            Example: oft = often, frequently
+6) All output should be in plain text."""
 
             response = client.chat.completions.create(model="gpt-4o",
             messages=[
