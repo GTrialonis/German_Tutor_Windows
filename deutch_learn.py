@@ -195,7 +195,9 @@ class VocabularyApp:
             'SmallGoldYellow.TButton': {'background': '#EBCE65', 'foreground': 'black'},
             'SmallDarkRed.TButton': {'background': '#8B0000', 'foreground': 'white'},
             'SmallBlueish.TButton': {'background': '#5D6D7E', 'foreground': 'white'},
-            'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'}        
+            'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'},
+            'SmallDarkBrown.TButton': {'background': '#8B4513', 'foreground': 'white'},
+            'SmallDarkBlueTurquoise.TButton': {'background': '#005588', 'foreground': 'turquoise'}
             }
         
         for style_name, colors in color_styles.items():
@@ -1498,6 +1500,13 @@ class VocabularyApp:
             text="Create sentences from current _VOC file or select other _VOC.txt",
             style='SmallPurple.TButton',
             command=lambda: self.en_to_de_translation()
+        ).pack(side='left', padx=3, pady=3)
+
+        ttk.Button(
+            left_frame,
+            text="New Study Session",
+            style='SmallDarkBlueTurquoise.TButton',
+            command=self.reset_session
         ).pack(side='left', padx=3, pady=3)
 
     def create_middle_section(self):
@@ -3121,7 +3130,13 @@ Rules:
         """Clear translation"""
         self.translation_content_cleared = True  # Set flag to indicate content was cleared
         self.translation_textbox.delete(1.0, tk.END)
-        
+        self.current_translation_file = None
+
+    def reset_session(self):
+        """Reset session: clear all text boxes and reset file paths"""
+        self.clear_vocabulary()
+        self.clear_study_text()
+        self.clear_translation()
 
     def beautify_vocabulary(self):
         """Beautify vocabulary: remove preceding numbers and duplicates"""
