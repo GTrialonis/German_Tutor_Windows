@@ -197,6 +197,7 @@ class VocabularyApp:
             'SmallBlueish.TButton': {'background': '#5D6D7E', 'foreground': 'white'},
             'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'},
             'SmallDarkBrown.TButton': {'background': '#8B4513', 'foreground': 'white'},
+            'SmallDarkGreen.TButton': {'background': "#3C6605", 'foreground': 'white'},
             'SmallDarkBlueTurquoise.TButton': {'background': '#005588', 'foreground': 'turquoise'}
             }
         
@@ -1739,8 +1740,94 @@ class VocabularyApp:
                     style='SmallBlue.TButton',
                     command=self.create_translation_listen_popup
                 ).pack(side='left', padx=(10, 3), pady=3)
+            
+            # AI Improvise from the words in VOC (Current) to create English text for translation: button
+            if label_text == "Translation Box:":
+                ttk.Button(
+                    button_frame,
+                    text="AI text for EN to De translation",
+                    style='SmallDarkGreen.TButton',
+                    command=self.create_english_text_for_translation
+                ).pack(side='left', padx=(10, 3), pady=3)
         
         return textbox
+
+    def create_english_text_for_translation(self):
+        """Use current vocabulary to generate ~10-line English text for German translation practice."""
+        try:
+            vocab_text = self.vocabulary_textbox.get(1.0, tk.END).strip()
+        except Exception:
+            vocab_text = ""
+
+        if not vocab_text:
+            messagebox.showwarning("No Vocabulary", "Vocabulary box is empty. Load vocabulary first.")
+            return
+
+        lines = [line.strip() for line in vocab_text.splitlines() if line.strip()]
+        words = []
+        for line in lines:
+            # Heuristics: remove leading indexes and split on common separators
+            line_clean = re.sub(r"^[0-9]+[\.)\s]*", "", line)
+            parts = re.split(r"[\t\-–—;:,]+", line_clean)
+            if parts:
+                token = parts[0].strip()
+                if token:
+                    words.append(token)
+
+        unique_words = []
+        for w in words:
+            normalized = w.strip()
+            if not normalized:
+                continue
+            if normalized not in unique_words:
+                unique_words.append(normalized)
+        if not unique_words:
+            messagebox.showwarning("No Vocabulary", "Could not extract words from Vocabulary textbox. Please check format.")
+            return
+
+        seed_words = unique_words[:30]
+        word_list_display = ", ".join(seed_words)
+
+        variation_hints = [
+            "Try to be creative and use different themes each time.",
+            "Give fresh and varied examples; avoid repeating earlier phrases.",
+            "Use different sentence structures, locations, and situations.",
+            "Avoid repeating the exact same text from previous generations.",
+            "Keep it natural and practical for a language learner to translate."
+        ]
+        variation_hint = random.choice(variation_hints)
+
+        prompt = (
+            "You are a helpful English language assistant. "
+            "Using ONLY the ENGLISH words from the following vocabulary, create a coherent English text of about 10 lines (around 8-12 short sentences). "
+            "The text must stand on its own, be easy to translate to German, and use as many of the words as naturally as possible. "
+            "If some words cannot fit naturally, include them in a reasonable way. "
+            "Return only the English text, without numbering or extra explanation. \n\n"
+            f"Vocabulary words: {word_list_display}\n\n"
+            f"{variation_hint}"
+        )
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=450,
+            )
+            english_text = response.choices[0].message.content.strip()
+        except Exception as e:
+            # If the API call fails, provide a safe fallback text
+            english_text = (
+                "A short text was not available from AI due to an API error. "
+                "Please check your connection and try again."
+            )
+            messagebox.showerror("AI Error", f"Failed to generate text: {e}")
+
+        try:
+            self.translation_textbox.delete(1.0, tk.END)
+            self.translation_textbox.insert(tk.END, english_text)
+        except Exception as e:
+            messagebox.showerror("UI Error", f"Could not write to translation box: {e}")
 
     def update_vocabulary_label_path(self):
         """Update the Vocabulary label to include the current vocabulary file path (relative to Desktop)."""
