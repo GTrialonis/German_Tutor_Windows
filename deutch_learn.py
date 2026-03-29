@@ -15,6 +15,13 @@ import time
 import re
 import json
 from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+import pyperclip
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -1538,23 +1545,25 @@ class VocabularyApp:
         
         # Group 2: Study Text Buttons
         study_btn_frame = tk.Frame(middle_frame, bg="#222")
-        study_btn_frame.pack(pady=(2, 2)) # debug (15 replaced by 5)
+        study_btn_frame.pack(pady=(1, 1)) # tighter block space for more compact UI
 
-        ttk.Button(study_btn_frame, text="LOAD-TXT", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=2)
+        ttk.Button(study_btn_frame, text="LOAD-TXT", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=1)
+        ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=1)
         copy_txt_btn = ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text)
-        copy_txt_btn.pack(pady=2)
+        copy_txt_btn.pack(pady=1)
         Tooltip(copy_txt_btn, "Click to copy the entire text.")
-        ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=2)
-        ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=2)
-        free_hand_trans_btn = ttk.Button(study_btn_frame, text="Free-Hand\nTranslation", style='SmallLightPurple.TButton', command=self.capture_text)
-        free_hand_trans_btn.pack(pady=2)
+        ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=1)
+        ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=1)
+        free_hand_trans_btn = ttk.Button(study_btn_frame, text="FreeHand Transl", width=16, style='SmallLightPurple.TButton', command=self.capture_text)
+        free_hand_trans_btn.pack(pady=1)
         Tooltip(free_hand_trans_btn, "First load German text in the Study Text Box, then click button to translate into English.")
-        ttk.Button(study_btn_frame, text="  LISTEN to\nthe Study Text", style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=2)
+        ttk.Button(study_btn_frame, text="LISTEN StudyTxt", width=16, style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=1)
+        ttk.Button(study_btn_frame, text="SCAN Text", style='SmallOrange.TButton', command=self.scan_text).pack(pady=1)
+        ttk.Button(study_btn_frame, text="Ins Scanned Txt", style='SmallGoldBrown.TButton', command=self.insert_scanned_text).pack(pady=1)
 
         # Group 3: Translation Buttons
         translation_btn_frame = tk.Frame(middle_frame, bg="#222")
-        translation_btn_frame.pack(pady=(25, 0))
+        translation_btn_frame.pack(pady=(8, 0))
 
         ttk.Button(translation_btn_frame, text="LOAD-TRA", style='SmallBlue.TButton', command=self.load_translation).pack(pady=2)
         ttk.Button(translation_btn_frame, text="SAVE-TRA", style='SmallGreen.TButton', command=self.save_translation).pack(pady=2)
@@ -3074,6 +3083,206 @@ Rules:
             messagebox.showinfo("Copied", "Study text copied to clipboard!", parent=self.root)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to copy study text: {e}", parent=self.root)
+
+    def scan_text(self):
+        """Open the Scanmarker web app in Chrome for scanning German text."""
+        try:
+            # Show instruction dialog
+            messagebox.showinfo(
+                "Scanner Ready",
+                "The Scanmarker scanning interface will open in a new Chrome window.\n\n"
+                "Instructions:\n"
+                "1. Press the scanner on the left margin of a sentence\n"
+                "2. Trace the entire line quickly\n"
+                "3. Release pressure at the end of the sentence\n"
+                "4. The scanned text will be copied to clipboard\n"
+                "5. Return to this window and click 'Insert Scanned Text' button",
+                parent=self.root
+            )
+            
+            scanner_url = "https://app.scanmarker.com/#/scanning?translate=false"
+            
+            # APPROACH 1: Try using subprocess to open URL directly in Chrome
+            try:
+                import subprocess
+                import shlex
+                
+                # Find Chrome executable
+                chrome_paths = [
+                    os.path.expanduser("~\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe"),
+                    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+                ]
+                
+                chrome_exe = None
+                for path in chrome_paths:
+                    if os.path.exists(path):
+                        chrome_exe = path
+                        break
+                
+                if chrome_exe:
+                    # Open URL in Chrome directly using subprocess
+                    subprocess.Popen([chrome_exe, scanner_url])
+                    
+                    messagebox.showinfo(
+                        "Scanner Window Opened",
+                        "The scanner interface is now open in Chrome. Perform your scan and the text will be copied to clipboard.\n\n"
+                        "This window will remain open. When done scanning, click OK to return here and insert the text.",
+                        parent=self.root
+                    )
+                    return
+            except Exception as subprocess_error:
+                print(f"Subprocess approach failed: {subprocess_error}")
+                # Fall through to next approach
+            
+            # APPROACH 2: Try using Selenium with more robust error handling
+            try:
+                from selenium import webdriver
+                from selenium.webdriver.chrome.options import Options
+                
+                chrome_options = Options()
+                
+                # Use the default Chrome profile to preserve authentication
+                chrome_user_data = os.path.expanduser("~\\AppData\\Local\\Google\\Chrome\\User Data")
+                if os.path.exists(chrome_user_data):
+                    chrome_options.add_argument(f"user-data-dir={chrome_user_data}")
+                
+                chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+                
+                try:
+                    # Try with webdriver-manager
+                    from selenium.webdriver.chrome.service import Service
+                    from webdriver_manager.chrome import ChromeDriverManager
+                    
+                    service = Service(ChromeDriverManager().install())
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    driver.get(scanner_url)
+                    
+                    messagebox.showinfo(
+                        "Scanner Window Opened",
+                        "The scanner interface is now open. Perform your scan and the text will be copied to clipboard.\n\n"
+                        "This window will remain open. When done scanning, click OK to return here and insert the text.",
+                        parent=self.root
+                    )
+                    return
+                except Exception as webdriver_mgr_error:
+                    print(f"WebDriver Manager approach failed: {webdriver_mgr_error}")
+                    
+                    # Try without webdriver-manager (use system Chrome)
+                    try:
+                        driver = webdriver.Chrome(options=chrome_options)
+                        driver.get(scanner_url)
+                        
+                        messagebox.showinfo(
+                            "Scanner Window Opened",
+                            "The scanner interface is now open. Perform your scan and the text will be copied to clipboard.\n\n"
+                            "This window will remain open. When done scanning, click OK to return here and insert the text.",
+                            parent=self.root
+                        )
+                        return
+                    except Exception as selenium_error:
+                        print(f"Selenium approach failed: {selenium_error}")
+                        raise selenium_error
+                        
+            except Exception as selenium_error:
+                print(f"All WebDriver approaches failed: {selenium_error}")
+                # Fall through to manual approach
+            
+            # APPROACH 3: Fallback - Open in default browser and provide manual instructions
+            import webbrowser
+            webbrowser.open(scanner_url)
+            
+            messagebox.showinfo(
+                "Scanner Opened",
+                "The Scanmarker page has been opened in your default browser.\n\n"
+                "If it didn't open, please manually navigate to:\n"
+                f"{scanner_url}\n\n"
+                "Log in to your Scanmarker account if needed, then perform your scan.\n"
+                "When done, click 'Insert Scanned Text' to retrieve the text from clipboard.",
+                parent=self.root
+            )
+            
+        except Exception as e:
+            messagebox.showerror(
+                "Scanner Error",
+                f"Failed to open scanner interface: {e}\n\n"
+                f"Manual Workaround:\n"
+                f"1. Open your Chrome browser\n"
+                f"2. Go to: https://app.scanmarker.com/#/scanning?translate=false\n"
+                f"3. Log in to your Scanmarker account\n"
+                f"4. Perform your scan\n"
+                f"5. Return to this window and click 'Insert Scanned Text'",
+                parent=self.root
+            )
+
+    def insert_scanned_text(self):
+        """Insert scanned text from clipboard into the Study Text Box."""
+        try:
+            # Try to get text from clipboard using pyperclip first
+            scanned_text = pyperclip.paste()
+
+            # If pyperclip returned empty, try tkinter clipboard as another fallback
+            if not scanned_text or scanned_text.strip() == "":
+                try:
+                    scanned_text = self.root.clipboard_get()
+                except Exception:
+                    scanned_text = ""
+
+            # If still empty, provide actionable instruction and do not change Study Text Box
+            if not scanned_text or scanned_text.strip() == "":
+                messagebox.showwarning(
+                    "Empty Clipboard",
+                    "Clipboard appears empty. Please follow these steps:\n\n"
+                    "1. In the Scanmarker web app, ensure the scanned text is visible.\n"
+                    "2. Select the entire scanned text (Ctrl+A) and copy it manually (Ctrl+C).\n"
+                    "3. Return here and click 'Insert Scanned Text' again.\n\n"
+                    "If Scanmarker auto-copies, make sure the app is allowed to access clipboard.",
+                    parent=self.root
+                )
+                return
+
+            # Normalize line endings optionally
+            scanned_text = scanned_text.replace('\r\n', '\n')
+
+            # Insert the scanned text at the end of Study Text Box
+            current_content = self.study_textbox.get(1.0, tk.END)
+            
+            # Ask user if they want to append or replace
+            if current_content.strip():
+                result = messagebox.askyesnocancel(
+                    "Study Text Box Not Empty",
+                    "Study Text Box already contains text.\n\n"
+                    "Click 'Yes' to APPEND the scanned text\n"
+                    "Click 'No' to REPLACE the current text\n"
+                    "Click 'Cancel' to do nothing",
+                    parent=self.root
+                )
+                
+                if result is None:  # Cancel
+                    return
+                elif result is False:  # No - Replace
+                    self.study_textbox.delete(1.0, tk.END)
+            
+            # Insert the scanned text at the end
+            self.study_textbox.insert(tk.END, scanned_text)
+            
+            messagebox.showinfo(
+                "Text Inserted",
+                f"Scanned text successfully inserted into Study Text Box.\n"
+                f"Characters inserted: {len(scanned_text)}",
+                parent=self.root
+            )
+            
+        except Exception as e:
+            messagebox.showerror(
+                "Clipboard Error",
+                f"Failed to retrieve text from clipboard: {e}\n\n"
+                f"Please ensure:\n"
+                f"1. Text was scanned using the 'SCAN Text' button\n"
+                f"2. The scanned text is in the clipboard\n"
+                f"3. Try copying manually to clipboard and try again",
+                parent=self.root
+            )
 
     def load_study_text(self):
         """Load study text file"""
