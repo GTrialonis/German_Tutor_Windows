@@ -1558,7 +1558,9 @@ class VocabularyApp:
         free_hand_trans_btn.pack(pady=1)
         Tooltip(free_hand_trans_btn, "First load German text in the Study Text Box, then click button to translate into English.")
         ttk.Button(study_btn_frame, text="LISTEN StudyTxt", width=16, style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=1)
-        ttk.Button(study_btn_frame, text="SCAN Text", style='SmallOrange.TButton', command=self.scan_text).pack(pady=1)
+        scan_text_btn = ttk.Button(study_btn_frame, text="SCAN Text", style='SmallOrange.TButton', command=self.scan_text)
+        scan_text_btn.pack(pady=1)
+        Tooltip(scan_text_btn, "Opens Scanmarker web app in Chrome using your existing profile. Scan German text, copy it to clipboard, then use 'Ins Scanned Txt' button to insert into Study Text Box.")
         ttk.Button(study_btn_frame, text="Ins Scanned Txt", style='SmallGoldBrown.TButton', command=self.insert_scanned_text).pack(pady=1)
 
         # Group 3: Translation Buttons
@@ -1920,7 +1922,7 @@ class VocabularyApp:
         """Look up German noun declension using OpenAI API"""
         prompt = f"""
         For the word "{noun}" as used in the German language, provide the following information in this exact format:
-        
+
         Article: [definite article - der, die, or das]
         Plural: [plural form]
 
@@ -1935,6 +1937,8 @@ class VocabularyApp:
         Genitive: [article + plural form]  
         Dative: [article + plural form]
         Accusative: [article + plural form]
+
+        If "{noun}" is in any other case other than the nominative singular, find the nominative singular and decline it as instructed here.
         
         If "{noun}" is not commonly used as a noun in German, respond with: "Not a German noun"
         """
@@ -2060,6 +2064,13 @@ class VocabularyApp:
             prompt = """You are a German-English linguistic analysis tool. Your task is to process a German text, filter it based on a custom stopword list, and then generate a formatted vocabulary list with specific grammatical information and English translations.
 
             Give me a vocabulary list with English translations (max. 3) from the the German text.
+
+            Stopword List: Oh, nein, ya, oder, der, die, das, Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag, Januar, Februar, März, April, Mai, Juni, Juli, August, September, Oktober, November, Dezember, ich, du, er, sie, es, wir, ihr, Sie, in, an, auf,
+            unter, über, vor, hinter, neben, zwischen, mit, nach, bei, seit, von, zu, für, durch, um, und, aber, gegen, ohne, am, zur, Man, Frau, Kind, mich, dich, sich, uns, euch, ihnen, nicht, ja, nun, ob, ist, sein, war, waren, haben, hat, gehabt, wurde, wurden, wird, 
+            Frühling, Sommer, Herbst, Winter, Wasser, Feuer, Erde, Luft, Himmel, Sonne, Mond, Stern, Tag, Nacht, Zeit, Jahr, heute, morgen, gestern, immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht, 
+            gute, großer, kleine, schön, alt, jung, neu, lang, kurz, schnell, langsam, hoch, niedrig, warm, kalt, Dorf, Geschichte, Mensch, Leben, Arbeit, Stadt, Land, Auto, Buch, Musik, Sprache, Frage, Antwort, Weg, Hand, Auge, Kopf, Herz,
+            Freund, Liebe, Familie, Schule, Universität, Lehrer, Schüler, Essen, Trinken, Geld, Kleidung, Haus, Baum, Tier, Hund, Katze, Vogel, Fisch, Straße, Brücke, Berg, Fluss, Meer, Himmel.
+            immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht
 Rules: 
 1) All output should be in plain text, i.e. list entries should not be preceded by numbers, asterisks, bullets, etc.
 2) for any verb form or type you encounter, return the three basic forms in German: Infinitiv, [Präteritum, Partizip II] = translation1, translation2, translation3, for example: if you encounter 'sprichst' or 'sprachen' or any other form of the same verb, you output: sprechen, [sprach, gesprochen] = speak, say, relate.
