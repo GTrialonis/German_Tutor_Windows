@@ -69,11 +69,6 @@ class Tooltip:
         self.tooltip = tk.Toplevel(self.widget)
         self.tooltip.wm_overrideredirect(True)
         
-        # Position tooltip near cursor
-        x = self.widget.winfo_rootx() + 10
-        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
-        self.tooltip.wm_geometry(f"+{x}+{y}")
-        
         # Create label with text
         label = tk.Label(
             self.tooltip,
@@ -87,6 +82,15 @@ class Tooltip:
             pady=3
         )
         label.pack()
+        
+        # Update to get actual size
+        self.tooltip.update_idletasks()
+        tooltip_height = self.tooltip.winfo_height()
+        
+        # Position tooltip above the widget
+        x = self.widget.winfo_rootx() + 10
+        y = self.widget.winfo_rooty() - tooltip_height - 5
+        self.tooltip.wm_geometry(f"+{x}+{y}")
     
     def hide_tooltip(self, event=None):
         """Hide the tooltip."""
@@ -1510,12 +1514,14 @@ class VocabularyApp:
             command=lambda: self.en_to_de_translation()
         ).pack(side='left', padx=3, pady=3)
 
-        ttk.Button(
+        new_session_btn = ttk.Button(
             left_frame,
             text="New Study Session",
             style='SmallDarkBlueTurquoise.TButton',
             command=self.reset_session
-        ).pack(side='left', padx=3, pady=3)
+        )
+        new_session_btn.pack(side='left', padx=3, pady=3)
+        Tooltip(new_session_btn, "Click for a fresh start of the program")
 
     def create_middle_section(self):
         """Create the middle section with control buttons"""
@@ -1713,12 +1719,14 @@ class VocabularyApp:
             
             # Add the "READING Comprehension" button only for Study Text Box
             if label_text == "Study Text Box:":
-                ttk.Button(
+                reading_comp_btn = ttk.Button(
                     button_frame,
                     text="READING Comprehension",
                     style='SmallPurple.TButton',
                     command=self.show_reading_comprehension_options
-                ).pack(side='left', padx=(15, 3), pady=3)
+                )
+                reading_comp_btn.pack(side='left', padx=(15, 3), pady=3)
+                Tooltip(reading_comp_btn, "Click to answer questions about the entire text or about the selected (Ctrl+C) text in the clipboard")
                 
                 ttk.Button(
                     button_frame,
@@ -1753,13 +1761,15 @@ class VocabularyApp:
                 ).pack(side='left', padx=(10, 3), pady=3)
             
             # AI Improvise from the words in VOC (Current) to create English text for translation: button
-            if label_text == "Translation Box:":
-                ttk.Button(
-                    button_frame,
-                    text="AI text for EN to De translation",
-                    style='SmallDarkGreen.TButton',
-                    command=self.create_english_text_for_translation
-                ).pack(side='left', padx=(10, 3), pady=3)
+        if label_text == "Translation Box:":
+            en_to_de_btn = ttk.Button(
+                button_frame,
+                text="AI text for EN to De translation",
+                style='SmallDarkGreen.TButton',
+                command=self.create_english_text_for_translation
+            )
+            en_to_de_btn.pack(side='left', padx=(10, 3), pady=3)
+            Tooltip(en_to_de_btn, "Click to generate English text from your vocabulary to practice translating into German.")
         
         return textbox
 
