@@ -1559,10 +1559,11 @@ class VocabularyApp:
         copy_txt_btn.pack(pady=1)
         Tooltip(copy_txt_btn, "Click to copy the entire text.")
         ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=1)
-        ttk.Button(study_btn_frame, text="Translate file", style='SmallDarkPurple.TButton', command=lambda: self.translate_study_text()).pack(pady=1)
-        free_hand_trans_btn = ttk.Button(study_btn_frame, text="FreeHand Transl", width=16, style='SmallLightPurple.TButton', command=self.capture_text)
-        free_hand_trans_btn.pack(pady=1)
-        Tooltip(free_hand_trans_btn, "First load German text in the Study Text Box, then click button to translate into English.")
+        translate_btn = tk.Button(study_btn_frame, text="Translate", bg="#E6D5F5", fg="#333333", font=("Arial", 10), command=self.show_translate_popup)
+        translate_btn.pack(pady=1)
+        Tooltip(translate_btn, "Translate the contents of the Study Text Box or choose file")
+        load_recent_btn = tk.Button(study_btn_frame, text="Load Recent", bg="#7CB342", fg="black", command=self.load_recent)
+        load_recent_btn.pack(pady=1)
         ttk.Button(study_btn_frame, text="LISTEN StudyTxt", width=16, style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=1)
         scan_text_btn = ttk.Button(study_btn_frame, text="SCAN Text", style='SmallOrange.TButton', command=self.scan_text)
         scan_text_btn.pack(pady=1)
@@ -1589,6 +1590,62 @@ class VocabularyApp:
         ttk.Button(ai_responses_middle_btn_frame, text="Append", style='SmallDarkPurple.TButton', command=self.append_ai_responses_to_file).pack(pady=2)
         ttk.Button(ai_responses_middle_btn_frame, text="Copy", style='SmallDarkPurple.TButton', command=self.copy_ai_responses).pack(pady=2)
         ttk.Button(ai_responses_middle_btn_frame, text="Clear", style='SmallRed.TButton', command=self.clear_ai_responses_textbox).pack(pady=2)
+
+    def show_translate_popup(self):
+        """Show popup with translation options"""
+        popup = tk.Toplevel(self.root)
+        popup.title("Translate Options")
+        popup.configure(bg="#222")
+        popup.geometry("400x150")
+        
+        # Center the window
+        popup.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+        
+        # Instructions label
+        tk.Label(popup, text="Choose translation source:", bg="#222", fg="white", font=("Arial", 11)).pack(pady=15)
+        
+        # Button frame
+        button_frame = tk.Frame(popup, bg="#222")
+        button_frame.pack(pady=10)
+        
+        # Button 1: Translate from file (light pink pastel)
+        btn_file = tk.Button(
+            button_frame,
+            text="Translate from file",
+            bg="#FFB6C1",
+            fg="#333333",
+            font=("Arial", 11, "bold"),
+            width=20,
+            height=2,
+            cursor="hand2",
+            activebackground="#FFA7B4",
+            activeforeground="#333333",
+            command=lambda: [self.translate_study_text(), popup.destroy()]
+        )
+        btn_file.pack(side=tk.LEFT, padx=10)
+        
+        # Button 2: Translate contents of Study Text Box (sky blue pastel)
+        btn_textbox = tk.Button(
+            button_frame,
+            text="Translate contents of\nStudy Text Box",
+            bg="#87CEEB",
+            fg="#333333",
+            font=("Arial", 11, "bold"),
+            width=20,
+            height=2,
+            cursor="hand2",
+            activebackground="#7BC7E8",
+            activeforeground="#333333",
+            command=lambda: [self.capture_text(), popup.destroy()]
+        )
+        btn_textbox.pack(side=tk.LEFT, padx=10)
+
+    def load_recent(self):
+        """Load recent files or translations - placeholder"""
+        messagebox.showinfo("Load Recent", "Load Recent functionality is not yet implemented.")
 
     def create_right_section(self):
         """Create the right section of the UI"""
@@ -3639,7 +3696,7 @@ Rules:
 
     def load_examples(self):
         """Load example sentences"""
-        filename = r"C:\Users\George\Desktop\German_Study_Files\example-sentences.txt"
+        filename = r"C:\Users\George\Desktop\German_Study_Files\example-sentences_VOC.txt"
         # filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         if filename:
             self.current_example_sentences_file = filename  # Save the loaded filename
@@ -3651,20 +3708,16 @@ Rules:
 
     def save_examples(self):
         """Save example sentences"""
-        filename = filedialog.askopenfilename(
-            filetypes=[("Text files", "*.txt")],
-            title="Select file to append to"
-        )
-        
-        if filename: # debug
-                try:
-                    with open(filename, 'a+', encoding='utf-8-sig') as file:
-                        content = self.example_sentences_textbox.get(1.0, tk.END)
-                        file.write("\n\n")  # Add separation from previous content
-                        file.write(content)
-                    messagebox.showinfo("Success", f"Content appended to:\n{filename}")
-                except Exception as e:
-                    messagebox.showerror("Error", f"Failed to append to file:\n{str(e)}")
+        filename = r"C:\Users\George\Desktop\German_Study_Files\example-sentences_VOC.txt"
+        try:
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            with open(filename, 'a+', encoding='utf-8-sig') as file:
+                content = self.example_sentences_textbox.get(1.0, tk.END)
+                file.write("\n\n")  # Add separation from previous content
+                file.write(content)
+            messagebox.showinfo("Append Complete", f"Sentences appended to:\n{filename}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to append to file:\n{str(e)}")
 
     def clear_example_sentences(self):
         """Clear example sentences"""
