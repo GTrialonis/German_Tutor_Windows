@@ -226,23 +226,29 @@ class VocabularyApp:
         try:
             if os.path.exists(self.recent_voc_file_path):
                 with open(self.recent_voc_file_path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                    recent_data = []
-                    for line in lines:
-                        line = line.strip()
-                        if line:
-                            parts = line.split('|', 1)
-                            if len(parts) == 2:
-                                timestamp_str, filepath = parts
-                                try:
-                                    timestamp = datetime.fromisoformat(timestamp_str)
-                                    recent_data.append((timestamp, filepath))
-                                except ValueError:
-                                    continue
-                    # Sort by timestamp descending (most recent first)
-                    recent_data.sort(key=lambda x: x[0], reverse=True)
-                    # Extract just the filepaths, limit to 10
-                    self.recent_voc_files = [filepath for _, filepath in recent_data[:10]]
+                    lines = [line.strip() for line in f if line.strip()]
+                recent_data = []
+                for line in lines:
+                    if '|' in line:
+                        timestamp_str, filepath = line.split('|', 1)
+                        try:
+                            timestamp = datetime.fromisoformat(timestamp_str)
+                        except ValueError:
+                            timestamp = None
+                    else:
+                        timestamp = None
+                        filepath = line
+                    recent_data.append((timestamp, filepath))
+                # Sort by timestamp descending, but keep stable ordering for entries without valid timestamps
+                recent_data.sort(key=lambda item: item[0] if item[0] is not None else datetime.min, reverse=True)
+                seen = set()
+                self.recent_voc_files = []
+                for _, filepath in recent_data:
+                    if filepath not in seen:
+                        seen.add(filepath)
+                        self.recent_voc_files.append(filepath)
+                        if len(self.recent_voc_files) >= 20:
+                            break
         except Exception as e:
             print(f"Error loading recent VOC files: {e}")
 
@@ -2180,7 +2186,7 @@ class VocabularyApp:
 Rules: 
 1) All output should be in plain text, i.e. list entries should not be preceded by numbers, asterisks, bullets, etc.
 2) for any verb form or type you encounter, return the three basic forms in German: Infinitiv, [Präteritum, Partizip II] = translation1, translation2, translation3, for example: if you encounter 'sprichst' or 'sprachen' or any other form of the same verb, you output: sprechen, [sprach, gesprochen] = speak, say, relate.
-3) Nouns: follow this example for any noun form or case you encounter:: Buch, das, [Bücher, die] = book, volume, ledger
+3) Nouns: follow this example (singular first, then plural in brackets) for any noun form or case you encounter in the text, for example: Buch, das, [Bücher, die] = book, volume, ledger
 4) Adjectives: From any form of an adjective, identify its positive (base) form and follow this example: schnell, [schneller, schnellsten] = fast, quick, rapid.
 5) For Adverbs and All Other Word Types:
 
@@ -2241,11 +2247,6 @@ Rules:
                 if selected:
                     recent_popup.destroy()
                     self.load_vocabulary_from_file(selected)
-                    # Update timestamp by moving to end and saving
-                    if selected in self.recent_voc_files:
-                        self.recent_voc_files.remove(selected)
-                        self.recent_voc_files.append(selected)
-                        self.save_recent_voc_files()
             ttk.Button(recent_popup, text="Load", command=load_selected).pack(pady=5)
 
         def select_other():
@@ -2308,76 +2309,91 @@ Rules:
             with open(filename, 'w', encoding='utf-8-sig') as file:
                 content = self.vocabulary_textbox.get(1.0, tk.END)
                 file.write(content)
+                if filename in self.recent_voc_files:
+                    self.recent_voc_files.remove(filename)
+                self.recent_voc_files.insert(0, filename)
+                while len(self.recent_voc_files) > 20:
+                    self.recent_voc_files.pop()
+                self.save_recent_voc_files()
             messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
 
     def load_vocabulary_from_file(self, filename):
-        """Load vocabulary file with related files"""
-        if filename.endswith("_VOC.txt") or "_VOC.txt" in filename:
-            self.current_voc_file = filename
-            # Update the UI label to show the loaded file path (relative to Desktop)
-            try:
-                self.update_vocabulary_label_path()
-            except Exception:
-                pass
-            with open(filename, 'r', encoding='utf-8-sig') as file:
-                content = file.read()
-                self.vocabulary_textbox.delete(1.0, tk.END)
-                self.vocabulary_textbox.insert(tk.END, content)
-                self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
-                self.load_current_voc += 1
-                self.load_test_file()
-            
-            # Add to recent files
-            if filename not in self.recent_voc_files:
-                self.recent_voc_files.append(filename)
-                if len(self.recent_voc_files) > 10:
-                    self.recent_voc_files.pop(0)
-                self.save_recent_voc_files()
-            
-            # Ask user if they want to load related files
-            response = messagebox.askyesno(
-                "Load Related Files", 
-                "Do you want to also load the corresponding Study Text and Translation files?"
-            )
-            
-            if response:
-                base_name = filename.replace("_VOC.txt", "")
-                study_text_file = base_name + "_TXT.txt"
-                translation_file = base_name + "_TRA.txt"
-                
-                # Load Study Text file if it exists
-                if os.path.exists(study_text_file):
-                    try:
-                        with open(study_text_file, 'r', encoding='utf-8-sig') as file:
-                            content = file.read()
-                            self.current_study_file = study_text_file
-                            title = self.extract_title_from_text(content)
-                            self.update_study_text_label(title)
-                            cleaned_content = self.remove_title_line(content)
-                            self.study_textbox.delete(1.0, tk.END)
-                            self.study_textbox.insert(tk.END, cleaned_content)
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Failed to load study text: {str(e)}")
-                
-                # Load Translation file if it exists
-                if os.path.exists(translation_file):
-                    try:
-                        with open(translation_file, 'r', encoding='utf-8-sig') as file:
-                            content = file.read()
-                            self.current_translation_file = translation_file
-                            title = self.extract_title_from_text(content)
-                            self.update_translation_label(title)
-                            cleaned_content = self.remove_title_line(content)
-                            self.translation_textbox.delete(1.0, tk.END)
-                            self.translation_textbox.insert(tk.END, cleaned_content)
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Failed to load translation: {str(e)}")
-        
-        else:
+        """Load a vocabulary file, show it in the current vocabulary textbox, and update recent history."""
+        if not filename:
+            return
+
+        if not (filename.endswith("_VOC.txt") or "_VOC.txt" in filename):
             messagebox.showwarning(
                 "Invalid File Type",
                 "The selected file is not a vocabulary file.\n\nPlease select a file that ends with '_VOC.txt'."
             )
+            return
+
+        self.current_voc_file = filename
+
+        try:
+            with open(filename, 'r', encoding='utf-8-sig') as file:
+                content = file.read()
+        except FileNotFoundError:
+            messagebox.showerror("File Not Found", f"Could not open file:\n{filename}")
+            return
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read vocabulary file:\n{e}")
+            return
+
+        try:
+            self.update_vocabulary_label_path()
+        except Exception:
+            pass
+
+        self.vocabulary_textbox.delete(1.0, tk.END)
+        self.vocabulary_textbox.insert(tk.END, content)
+        self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
+        self.load_current_voc += 1
+        self.load_test_file()
+
+        if filename in self.recent_voc_files:
+            self.recent_voc_files.remove(filename)
+        self.recent_voc_files.insert(0, filename)
+        while len(self.recent_voc_files) > 20:
+            self.recent_voc_files.pop()
+        self.save_recent_voc_files()
+
+        response = messagebox.askyesno(
+            "Load Related Files",
+            "Do you want to also load the corresponding Study Text and Translation files?"
+        )
+
+        if response:
+            base_name = filename.replace("_VOC.txt", "")
+            study_text_file = base_name + "_TXT.txt"
+            translation_file = base_name + "_TRA.txt"
+
+            if os.path.exists(study_text_file):
+                try:
+                    with open(study_text_file, 'r', encoding='utf-8-sig') as file:
+                        content = file.read()
+                        self.current_study_file = study_text_file
+                        title = self.extract_title_from_text(content)
+                        self.update_study_text_label(title)
+                        cleaned_content = self.remove_title_line(content)
+                        self.study_textbox.delete(1.0, tk.END)
+                        self.study_textbox.insert(tk.END, cleaned_content)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to load study text: {str(e)}")
+
+            if os.path.exists(translation_file):
+                try:
+                    with open(translation_file, 'r', encoding='utf-8-sig') as file:
+                        content = file.read()
+                        self.current_translation_file = translation_file
+                        title = self.extract_title_from_text(content)
+                        self.update_translation_label(title)
+                        cleaned_content = self.remove_title_line(content)
+                        self.translation_textbox.delete(1.0, tk.END)
+                        self.translation_textbox.insert(tk.END, cleaned_content)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to load translation: {str(e)}")
 
     # === VOCABULARY TESTING METHODS ===
 
