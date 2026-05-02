@@ -1607,7 +1607,7 @@ class VocabularyApp:
         translate_btn = tk.Button(study_btn_frame, text="Translate", bg="#E6D5F5", fg="#333333", font=("Arial", 10), command=self.show_translate_popup)
         translate_btn.pack(pady=1)
         Tooltip(translate_btn, "Translate the contents of the Study Text Box or choose file")
-        load_recent_btn = tk.Button(study_btn_frame, text="Load Recent", bg="#7CB342", fg="black", command=self.load_recent)
+        load_recent_btn = tk.Button(study_btn_frame, text="Notebook", bg="#7CB342", fg="black", command=self.load_recent)
         load_recent_btn.pack(pady=1)
         ttk.Button(study_btn_frame, text="LISTEN StudyTxt", width=16, style='SmallBlue.TButton', command=self.create_listen_functionality).pack(pady=1)
         scan_text_btn = ttk.Button(study_btn_frame, text="SCAN Text", style='SmallOrange.TButton', command=self.scan_text)
@@ -1689,8 +1689,121 @@ class VocabularyApp:
         btn_textbox.pack(side=tk.LEFT, padx=10)
 
     def load_recent(self):
-        """Load recent files or translations - placeholder"""
-        messagebox.showinfo("Load Recent", "Load Recent functionality is not yet implemented.")
+        """Open notebook popup for writing short stories, essays, etc."""
+        # Create popup window
+        popup = tk.Toplevel(self.root)
+        popup.title("Notebook")
+        popup.configure(bg="#333")  # Dark background, not black
+        
+        # Get screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Set window size to 1/4 width, 1/2 height
+        window_width = screen_width // 4
+        window_height = screen_height // 2
+        
+        # Position on the right side of the screen
+        x_position = screen_width - window_width - 10  # 10px margin from right edge
+        y_position = (screen_height - window_height) // 2  # Center vertically
+        
+        popup.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+        popup.resizable(True, True)  # Make resizable
+        
+        # Create text area
+        text_frame = tk.Frame(popup, bg="#333")
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        text_area = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD, bg="#444", fg="white", 
+                                             insertbackground="white", font=("Arial", 11))
+        text_area.pack(fill=tk.BOTH, expand=True)
+        
+        # Create button frame
+        button_frame = tk.Frame(popup, bg="#333")
+        button_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        # Define soft colors for buttons
+        button_colors = {
+            'save': '#8BC34A',      # Soft green
+            'save_as': '#4CAF50',   # Medium green
+            'copy': '#FF9800',      # Soft orange
+            'close': '#F44336'      # Soft red
+        }
+        
+        # Save button
+        save_btn = tk.Button(button_frame, text="Save", bg=button_colors['save'], fg="black",
+                           font=("Arial", 10, "bold"), command=lambda: self.save_notebook(text_area))
+        save_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Save As button
+        save_as_btn = tk.Button(button_frame, text="Save As", bg=button_colors['save_as'], fg="black",
+                              font=("Arial", 10, "bold"), command=lambda: self.save_as_notebook(text_area))
+        save_as_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Copy to clipboard button
+        copy_btn = tk.Button(button_frame, text="Copy to Clipboard", bg=button_colors['copy'], fg="black",
+                           font=("Arial", 10, "bold"), command=lambda: self.copy_notebook_to_clipboard(text_area))
+        copy_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Close button
+        close_btn = tk.Button(button_frame, text="Close", bg=button_colors['close'], fg="black",
+                            font=("Arial", 10, "bold"), command=popup.destroy)
+        close_btn.pack(side=tk.RIGHT)
+        
+        # Focus on text area
+        text_area.focus_set()
+
+    def save_notebook(self, text_area):
+        """Save notebook content to a default file"""
+        try:
+            content = text_area.get("1.0", tk.END).strip()
+            if not content:
+                messagebox.showwarning("Empty Content", "Nothing to save. Please write something first.")
+                return
+            
+            # Default save location - you might want to make this configurable
+            default_file = os.path.join(os.path.dirname(__file__), "notebook.txt")
+            
+            with open(default_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            messagebox.showinfo("Saved", f"Notebook saved to {default_file}")
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Failed to save notebook: {str(e)}")
+
+    def save_as_notebook(self, text_area):
+        """Save notebook content with file dialog"""
+        try:
+            content = text_area.get("1.0", tk.END).strip()
+            if not content:
+                messagebox.showwarning("Empty Content", "Nothing to save. Please write something first.")
+                return
+            
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                title="Save Notebook As"
+            )
+            
+            if file_path:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                messagebox.showinfo("Saved", f"Notebook saved to {file_path}")
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Failed to save notebook: {str(e)}")
+
+    def copy_notebook_to_clipboard(self, text_area):
+        """Copy notebook content to clipboard"""
+        try:
+            content = text_area.get("1.0", tk.END).strip()
+            if not content:
+                messagebox.showwarning("Empty Content", "Nothing to copy. Please write something first.")
+                return
+            
+            pyperclip.copy(content)
+            messagebox.showinfo("Copied", "Notebook content copied to clipboard!")
+        except Exception as e:
+            messagebox.showerror("Copy Error", f"Failed to copy to clipboard: {str(e)}")
 
     def create_right_section(self):
         """Create the right section of the UI"""
