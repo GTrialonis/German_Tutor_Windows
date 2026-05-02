@@ -1699,12 +1699,12 @@ class VocabularyApp:
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
-        # Set window size to 1/4 width, 1/2 height
+        # Set window size to 1/4 width, 3/4 height (taller for better button visibility)
         window_width = screen_width // 4
-        window_height = screen_height // 2
+        window_height = screen_height * 3 // 4
         
-        # Position on the right side of the screen
-        x_position = screen_width - window_width - 10  # 10px margin from right edge
+        # Position about halfway to the right from the middle of the screen
+        x_position = screen_width * 3 // 4 - window_width // 2
         y_position = (screen_height - window_height) // 2  # Center vertically
         
         popup.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
