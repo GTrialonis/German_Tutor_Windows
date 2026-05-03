@@ -1602,7 +1602,7 @@ class VocabularyApp:
         ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=1)
         copy_txt_btn = ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text)
         copy_txt_btn.pack(pady=1)
-        Tooltip(copy_txt_btn, "Click to copy the entire text.")
+        Tooltip(copy_txt_btn, "Click to copy the entire text or the selected text.")
         ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=1)
         translate_btn = tk.Button(study_btn_frame, text="Translate", bg="#E6D5F5", fg="#333333", font=("Arial", 10), command=self.show_translate_popup)
         translate_btn.pack(pady=1)
@@ -1623,6 +1623,9 @@ class VocabularyApp:
         ttk.Button(translation_btn_frame, text="SAVE-TRA", style='SmallGreen.TButton', command=self.save_translation).pack(pady=2)
         ttk.Button(translation_btn_frame, text="CLR-TRA", style='SmallRed.TButton', command=self.clear_translation).pack(pady=2)
         ttk.Button(translation_btn_frame, text="NOTES", style='SmallGoldBrown.TButton', command=self.add_notes).pack(pady=2)
+        copy_tra_btn = ttk.Button(translation_btn_frame, text="COPY-TRA", style='SmallBrownish.TButton', command=self.copy_translation_text)
+        copy_tra_btn.pack(pady=2)
+        Tooltip(copy_tra_btn, "Click to copy the entire text or selected text from Translation Box.")
         
         # Group 4: AI Response Buttons
         ai_responses_label = tk.Label(middle_frame, text="AI Responses", bg="#222", fg="gold", font=("Arial", 12, "bold"))
@@ -1693,6 +1696,7 @@ class VocabularyApp:
         # Create popup window
         popup = tk.Toplevel(self.root)
         popup.title("Notebook")
+        popup.attributes('-topmost', True)  # Keep window on top
         popup.configure(bg="#333")  # Dark background, not black
         
         # Get screen dimensions
@@ -1744,6 +1748,11 @@ class VocabularyApp:
         copy_btn = tk.Button(button_frame, text="Copy to Clipboard", bg=button_colors['copy'], fg="black",
                            font=("Arial", 10, "bold"), command=lambda: self.copy_notebook_to_clipboard(text_area))
         copy_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Clear button
+        clear_btn = tk.Button(button_frame, text="Clear", bg="#E74C3C", fg="black",
+                            font=("Arial", 10, "bold"), command=lambda: text_area.delete(1.0, tk.END))
+        clear_btn.pack(side=tk.LEFT, padx=(0, 5))
         
         # Close button
         close_btn = tk.Button(button_frame, text="Close", bg=button_colors['close'], fg="black",
@@ -3364,22 +3373,89 @@ Rules:
     # === FILE OPERATION PLACEHOLDERS ===
 
     def copy_study_text(self):
-        """Copy the Study Text Box content to the clipboard."""
-        try:
-            content = self.study_textbox.get(1.0, tk.END).strip()
-
-            if not content:
-                messagebox.showwarning("No Text", "Study Text Box is empty.", parent=self.root)
-                return
-
-            # Update the clipboard
-            self.root.clipboard_clear()
-            self.root.clipboard_append(content)
-
-            # Optional feedback to the user
-            messagebox.showinfo("Copied", "Study text copied to clipboard!", parent=self.root)
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to copy study text: {e}", parent=self.root)
+        """Show popup with copy options for Study Text Box."""
+        content = self.study_textbox.get(1.0, tk.END).strip()
+        
+        if not content:
+            messagebox.showwarning("No Text", "Study Text Box is empty.", parent=self.root)
+            return
+        
+        # Create popup window
+        popup = tk.Toplevel(self.root)
+        popup.title("Copy Options")
+        popup.configure(bg="#222")
+        popup.geometry("350x140")
+        
+        # Center the window
+        popup.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+        
+        # Instructions label
+        tk.Label(popup, text="Choose what to copy:", bg="#222", fg="white", font=("Arial", 11)).pack(pady=15)
+        
+        # Button frame
+        button_frame = tk.Frame(popup, bg="#222")
+        button_frame.pack(pady=10)
+        
+        def copy_entire():
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(content)
+                messagebox.showinfo("Copied", "Entire text copied to clipboard!")
+                popup.destroy()
+            except Exception as e:
+                messagebox.showerror("Copy Error", f"Failed to copy: {str(e)}")
+        
+        def copy_selected():
+            try:
+                selected_text = self.study_textbox.get(tk.SEL_FIRST, tk.SEL_LAST)
+                if not selected_text:
+                    messagebox.showwarning("No Selection", "Please select text first.")
+                    return
+                self.root.clipboard_clear()
+                self.root.clipboard_append(selected_text)
+                messagebox.showinfo("Copied", "Selected text copied to clipboard!")
+                popup.destroy()
+            except tk.TclError:
+                messagebox.showwarning("No Selection", "Please select text first.")
+        
+        # Entire Text button
+        btn_entire = tk.Button(
+            button_frame,
+            text="Entire Text",
+            bg="#3498DB",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            command=copy_entire
+        )
+        btn_entire.pack(side=tk.LEFT, padx=5)
+        
+        # Selected Text button
+        btn_selected = tk.Button(
+            button_frame,
+            text="Selected Text",
+            bg="#2ECC71",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            command=copy_selected
+        )
+        btn_selected.pack(side=tk.LEFT, padx=5)
+        
+        # Cancel button
+        btn_cancel = tk.Button(
+            button_frame,
+            text="Cancel",
+            bg="#E74C3C",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            command=popup.destroy
+        )
+        btn_cancel.pack(side=tk.LEFT, padx=5)
 
     def scan_text(self):
         """Open the Scanmarker web app in Chrome for scanning German text."""
@@ -3894,6 +3970,91 @@ Rules:
 
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Translation Error", f"An error occurred: {e}")
+
+    def copy_translation_text(self):
+        """Show popup with copy options for Translation Box."""
+        content = self.translation_textbox.get(1.0, tk.END).strip()
+        
+        if not content:
+            messagebox.showwarning("No Text", "Translation Box is empty.", parent=self.root)
+            return
+        
+        # Create popup window
+        popup = tk.Toplevel(self.root)
+        popup.title("Copy Options")
+        popup.configure(bg="#222")
+        popup.geometry("350x140")
+        
+        # Center the window
+        popup.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+        
+        # Instructions label
+        tk.Label(popup, text="Choose what to copy:", bg="#222", fg="white", font=("Arial", 11)).pack(pady=15)
+        
+        # Button frame
+        button_frame = tk.Frame(popup, bg="#222")
+        button_frame.pack(pady=10)
+        
+        def copy_entire():
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(content)
+                messagebox.showinfo("Copied", "Entire text copied to clipboard!")
+                popup.destroy()
+            except Exception as e:
+                messagebox.showerror("Copy Error", f"Failed to copy: {str(e)}")
+        
+        def copy_selected():
+            try:
+                selected_text = self.translation_textbox.get(tk.SEL_FIRST, tk.SEL_LAST)
+                if not selected_text:
+                    messagebox.showwarning("No Selection", "Please select text first.")
+                    return
+                self.root.clipboard_clear()
+                self.root.clipboard_append(selected_text)
+                messagebox.showinfo("Copied", "Selected text copied to clipboard!")
+                popup.destroy()
+            except tk.TclError:
+                messagebox.showwarning("No Selection", "Please select text first.")
+        
+        # Entire Text button
+        btn_entire = tk.Button(
+            button_frame,
+            text="Entire Text",
+            bg="#9B59B6",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            command=copy_entire
+        )
+        btn_entire.pack(side=tk.LEFT, padx=5)
+        
+        # Selected Text button
+        btn_selected = tk.Button(
+            button_frame,
+            text="Selected Text",
+            bg="#F39C12",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            command=copy_selected
+        )
+        btn_selected.pack(side=tk.LEFT, padx=5)
+        
+        # Cancel button
+        btn_cancel = tk.Button(
+            button_frame,
+            text="Cancel",
+            bg="#E74C3C",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15,
+            command=popup.destroy
+        )
+        btn_cancel.pack(side=tk.LEFT, padx=5)
 
     def add_notes(self):
         """Open notes editor"""
