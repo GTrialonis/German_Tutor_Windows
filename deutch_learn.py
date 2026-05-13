@@ -1522,8 +1522,9 @@ class VocabularyApp:
         # Create textboxes
         self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=9, label_font=self.left_section_font, add_buttons=False)
         self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=10, label_font=self.left_section_font, add_buttons=True)
-        tk.Label(left_frame, text="Double-click on a German noun in the Study Textbox to see it declined.", fg="cyan", bg="#222").pack(anchor='w')
+        tk.Label(left_frame, text="In the Study Text Box: double-click on a German noun to see it declined. Shift + Right click on mouse to find word in Vocabulary.", fg="cyan", bg="#222").pack(anchor='w')
         self.study_textbox.bind('<Double-Button-1>', self.on_study_text_double_click)
+        self.study_textbox.bind('<Shift-Button-3>', self.on_study_text_shift_right_click)
         self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=9, label_font=self.left_section_font, add_buttons=True)
         self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=self.left_section_font, add_buttons=False)
 
@@ -1912,8 +1913,9 @@ class VocabularyApp:
         
         textbox.pack(fill=tk.X, pady=(5, 0))
         
-        # Configure highlight tag
+        # Configure highlight tags
         textbox.tag_configure("highlight", background="yellow", foreground="black")
+        textbox.tag_configure("search_highlight", background="#ffec8b", foreground="black")
         
         # Add buttons if requested
         if add_buttons:
@@ -2136,6 +2138,38 @@ class VocabularyApp:
         if focused_widget in [self.vocabulary_textbox, self.study_textbox, self.translation_textbox]:
             self.clear_text_highlight(focused_widget)
         return "break"
+
+    def on_study_text_shift_right_click(self, event):
+        """Handle Shift+Right-Click on study text to find the word in Vocabulary."""
+        try:
+            index = self.study_textbox.index(f"@{event.x},{event.y}")
+            word_start = self.study_textbox.index(f"{index} wordstart")
+            word_end = self.study_textbox.index(f"{index} wordend")
+            word = self.study_textbox.get(word_start, word_end).strip()
+            word = re.sub(r'^[^\wäöüÄÖÜẞß]+|[^\wäöüÄÖÜẞß]+$', '', word)
+            if not word:
+                return "break"
+            self.find_word_in_vocabulary(word)
+        except Exception as e:
+            print(f"Shift-right-click error: {e}")
+        return "break"
+
+    def find_word_in_vocabulary(self, word):
+        """Search the current Vocabulary Box for the selected word and highlight the match."""
+        vocab_content = self.vocabulary_textbox.get("1.0", tk.END).strip()
+        if not vocab_content:
+            messagebox.showwarning("No Vocabulary", "Vocabulary Box is empty. Load vocabulary first.")
+            return
+
+        self.vocabulary_textbox.tag_remove("search_highlight", "1.0", tk.END)
+        position = self.vocabulary_textbox.search(word, "1.0", stopindex=tk.END, regexp=False)
+        if position:
+            end = f"{position}+{len(word)}c"
+            self.vocabulary_textbox.tag_add("search_highlight", position, end)
+            self.vocabulary_textbox.see(position)
+            self.vocabulary_textbox.focus_set()
+        else:
+            messagebox.showinfo("Not found", f'"{word}" not found in Vocabulary.')
 
     # === NOUN LOOK-UP FUNCTIONALITY ===
 
