@@ -87,9 +87,14 @@ class Tooltip:
         self.tooltip.update_idletasks()
         tooltip_height = self.tooltip.winfo_height()
         
-        # Position tooltip above the widget
+        # Position tooltip below the widget
         x = self.widget.winfo_rootx() + 10
-        y = self.widget.winfo_rooty() - tooltip_height - 5
+        # Use the widget height to place the tooltip just below it
+        try:
+            widget_height = self.widget.winfo_height()
+        except Exception:
+            widget_height = 0
+        y = self.widget.winfo_rooty() + widget_height + 5
         self.tooltip.wm_geometry(f"+{x}+{y}")
     
     def hide_tooltip(self, event=None):
@@ -146,12 +151,22 @@ class VocabularyApp:
         self.current_question_index = 0
         self.listening_score = 0
         self.total_listening_questions = 0
-        self.listening_dir = "list_compr_files"
-        os.makedirs(self.listening_dir, exist_ok=True)
+        # Create directories relative to the script location; fall back to the user's home directory
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        try:
+            self.listening_dir = os.path.join(base_dir, "list_compr_files")
+            os.makedirs(self.listening_dir, exist_ok=True)
+        except PermissionError:
+            self.listening_dir = os.path.join(os.path.expanduser("~"), "German_Tutor_list_compr_files")
+            os.makedirs(self.listening_dir, exist_ok=True)
 
         # Reading session progress variables
-        self.reading_session_dir = "reading_session_progress"
-        os.makedirs(self.reading_session_dir, exist_ok=True)
+        try:
+            self.reading_session_dir = os.path.join(base_dir, "reading_session_progress")
+            os.makedirs(self.reading_session_dir, exist_ok=True)
+        except PermissionError:
+            self.reading_session_dir = os.path.join(os.path.expanduser("~"), "German_Tutor_reading_session_progress")
+            os.makedirs(self.reading_session_dir, exist_ok=True)
         self.current_reading_session_file = None
         self.current_study_text_for_session = ""
 
@@ -1614,7 +1629,9 @@ class VocabularyApp:
         scan_text_btn = ttk.Button(study_btn_frame, text="SCAN Text", style='SmallOrange.TButton', command=self.scan_text)
         scan_text_btn.pack(pady=1)
         Tooltip(scan_text_btn, "Opens Scanmarker web app in Chrome using your existing profile. Scan German text, copy it to clipboard, then use 'Ins Scanned Txt' button to insert into Study Text Box.")
-        ttk.Button(study_btn_frame, text="Ins Scanned Txt", style='SmallGoldBrown.TButton', command=self.insert_scanned_text).pack(pady=1)
+        ins_scanned_btn = ttk.Button(study_btn_frame, text="Ins Scanned Txt", style='SmallGoldBrown.TButton', command=self.insert_scanned_text)
+        ins_scanned_btn.pack(pady=1)
+        Tooltip(ins_scanned_btn, "Click button 'SCAN Text' first")
 
         # Group 3: Translation Buttons
         translation_btn_frame = tk.Frame(middle_frame, bg="#222")
@@ -2658,30 +2675,56 @@ Rules:
         """Save failed word to revision file"""
         filename = "revise-de_VOC.txt" if not self.flip_mode else "revise-en_VOC.txt"
         missed_line = self.current_word.strip()
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(script_dir, filename)
 
         try:
-            with open(filename, 'r', encoding='utf-8-sig') as f:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
                 lines = f.read().splitlines()
         except FileNotFoundError:
             lines = []
 
         if missed_line not in lines:
-            with open(filename, 'a', encoding='utf-8-sig') as f:
+            with open(file_path, 'a', encoding='utf-8-sig') as f:
                 f.write(missed_line + "\n")
 
     def load_revision_file(self):
         """Load revision file for mistake review"""
-        filename = "revise-de_VOC.txt" if not self.flip_mode else "revise-en_VOC.txt"
+        # Always load the German revision file when Revise Mistakes is clicked
+        filename = "revise-de_VOC.txt"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        found_path = None
+        for base in (script_dir, os.getcwd()):
+            path = os.path.join(base, filename)
+            if os.path.exists(path):
+                found_path = path
+                break
 
-        try:
-            with open(filename, 'r', encoding='utf-8-sig') as f:
-                self.vocabulary = [line.strip() for line in f if line.strip()]
-            self.test_textbox.delete(1.0, tk.END)
-            self.test_textbox.insert(tk.END, f"Loaded {len(self.vocabulary)} revision items from {filename}\n")
-        except FileNotFoundError:
-            self.test_textbox.delete(1.0, tk.END)
+        self.vocabulary = []
+        self.test_textbox.delete(1.0, tk.END)
+
+        if not found_path:
             self.test_textbox.insert(tk.END, f"No revision file found: {filename}\n")
-        
+        else:
+            try:
+                with open(found_path, 'r', encoding='utf-8-sig') as f:
+                    items = [line.strip() for line in f.readlines() if line.strip()]
+                # preserve order and uniqueness
+                seen = set()
+                merged = []
+                for it in items:
+                    if it not in seen:
+                        seen.add(it)
+                        merged.append(it)
+                self.vocabulary = merged
+                if self.vocabulary:
+                    self.test_textbox.insert(tk.END, f"Loaded {len(self.vocabulary)} revision items from {os.path.basename(found_path)}\n")
+                else:
+                    self.test_textbox.insert(tk.END, f"Revision file found but contains no items: {os.path.basename(found_path)}\n")
+            except Exception as e:
+                self.test_textbox.insert(tk.END, f"Failed to read revision file: {e}\n")
+
+        # Show the next test word (or message if none)
         self.display_random_word()
 
     # === READING COMPREHENSION ===
