@@ -348,7 +348,7 @@ class VocabularyApp:
             )
             if filename:
                 try:
-                    with open(filename, 'r', encoding='utf-8') as file:
+                    with open(filename, 'r', encoding='utf-8-sig') as file:
                         self.listening_comprehension_text = file.read()
                     
                     self.current_voice = voice_var.get()
@@ -582,7 +582,7 @@ class VocabularyApp:
             """
             
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
             )
@@ -696,7 +696,7 @@ class VocabularyApp:
             """
             
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
             )
@@ -860,7 +860,7 @@ class VocabularyApp:
             """
 
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
             )
@@ -2840,7 +2840,7 @@ Rules:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=self.conversation_history,
                 temperature=0.7,
             )
