@@ -195,6 +195,7 @@ class VocabularyApp:
         self.create_middle_section()
         self.create_right_section()
         self.add_highlight_functionality()
+        self.initialize_change_tracking()
 
         # Ensure Prompt AI button is enabled on startup
         self.root.after(100, self.ensure_prompt_ai_enabled)
@@ -1580,7 +1581,7 @@ class VocabularyApp:
             left_frame,
             text="New Study Session",
             style='SmallDarkBlueTurquoise.TButton',
-            command=self.reset_session
+            command=self.confirm_reset_session
         )
         new_session_btn.pack(side='left', padx=3, pady=3)
         Tooltip(new_session_btn, "Click for a fresh start of the program")
@@ -1605,7 +1606,7 @@ class VocabularyApp:
         fix_verbs_btn = ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs)
         fix_verbs_btn.pack(pady=2)
         Tooltip(fix_verbs_btn, "Find all verbs and format them as: infinitive, Präteritum, Partizip II. Append them at the end of the vocabulary.")
-        ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.clear_vocabulary).pack(pady=2)
+        ttk.Button(vocab_btn_frame, text="CLR-VOC", style='SmallRed.TButton', command=self.confirm_clear_vocabulary).pack(pady=2)
         search_vocab_btn = ttk.Button(vocab_btn_frame, text="🔍 Search Vocab.", style='SmallBlue.TButton',
                 command=self.show_vocabulary_search)
         search_vocab_btn.pack(side=tk.RIGHT, padx=(0, 5))
@@ -1620,7 +1621,7 @@ class VocabularyApp:
         copy_txt_btn = ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text)
         copy_txt_btn.pack(pady=1)
         Tooltip(copy_txt_btn, "Click to copy the entire text or the selected text.")
-        ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.clear_study_text).pack(pady=1)
+        ttk.Button(study_btn_frame, text="CLR-TXT", style='SmallRed.TButton', command=self.confirm_clear_study_text).pack(pady=1)
         translate_btn = tk.Button(study_btn_frame, text="Translate", bg="#E6D5F5", fg="#333333", font=("Arial", 10), command=self.show_translate_popup)
         translate_btn.pack(pady=1)
         Tooltip(translate_btn, "Translate the contents of the Study Text Box or choose file")
@@ -1640,7 +1641,7 @@ class VocabularyApp:
 
         ttk.Button(translation_btn_frame, text="LOAD-TRA", style='SmallBlue.TButton', command=self.load_translation).pack(pady=2)
         ttk.Button(translation_btn_frame, text="SAVE-TRA", style='SmallGreen.TButton', command=self.save_translation).pack(pady=2)
-        ttk.Button(translation_btn_frame, text="CLR-TRA", style='SmallRed.TButton', command=self.clear_translation).pack(pady=2)
+        ttk.Button(translation_btn_frame, text="CLR-TRA", style='SmallRed.TButton', command=self.confirm_clear_translation).pack(pady=2)
         ttk.Button(translation_btn_frame, text="NOTES", style='SmallGoldBrown.TButton', command=self.add_notes).pack(pady=2)
         copy_tra_btn = ttk.Button(translation_btn_frame, text="COPY-TRA", style='SmallBrownish.TButton', command=self.copy_translation_text)
         copy_tra_btn.pack(pady=2)
@@ -2491,6 +2492,9 @@ Rules:
                     self.recent_voc_files.pop()
                 self.save_recent_voc_files()
             messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
+            self.set_baseline('Vocabulary (Current)')
+            return True
+        return False
 
     def load_vocabulary_from_file(self, filename):
         """Load a vocabulary file, show it in the current vocabulary textbox, and update recent history."""
@@ -2524,6 +2528,7 @@ Rules:
         self.vocabulary_textbox.delete(1.0, tk.END)
         self.vocabulary_textbox.insert(tk.END, content)
         self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
+        self.set_baseline('Vocabulary (Current)')
         self.load_current_voc += 1
         self.load_test_file()
 
@@ -3739,73 +3744,103 @@ Rules:
     def load_study_text(self):
         """Load study text file"""
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        if not filename:
+            return
 
         if filename.endswith("_TXT.txt") or "_TXT.txt" in filename:
             self.current_study_file = filename
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
-                
-                # Extract title
-                title = self.extract_title_from_text(content)
-                
-                # Update the label - search more broadly
-                self.update_study_text_label(title)
-                
-                # Remove title line and insert cleaned content
-                cleaned_content = self.remove_title_line(content)
-                self.study_textbox.delete(1.0, tk.END)
-                self.study_textbox.insert(tk.END, cleaned_content)
+
+            # Extract title
+            title = self.extract_title_from_text(content)
+            self.update_study_text_label(title)
+
+            # Remove title line and insert cleaned content
+            cleaned_content = self.remove_title_line(content)
+            self.study_textbox.delete(1.0, tk.END)
+            self.study_textbox.insert(tk.END, cleaned_content)
+            self.reset_box_dirty('Study Text Box')
+            self.set_baseline('Study Text Box')
+            return
+
+        messagebox.showwarning(
+            "Invalid File Type",
+            "The selected file is not a study text file.\n\n"
+            "Please select a file that contains '_TXT' in its name.\n\n"
+        )
 
     def save_study_text(self):
         """Save study text to file"""
-        filename = None  # Initialize filename to None
-        
-        if not self.current_study_file:
+        filename = self.current_study_file
+
+        if not filename:
             filename = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text files", "*.txt")]
             )
+            if not filename:
+                return False
 
-            if filename:
+            nwext = os.path.splitext(filename)[0]
+            if '_TXT' not in filename:
+                filename = nwext + '_TXT.txt'
+            self.current_study_file = filename
+        else:
+            choice = messagebox.askyesnocancel(
+                "Save Options",
+                f"Overwrite existing file?\n{filename}\n\n"
+                "Yes = Overwrite\nNo = Save as new file\nCancel = Abort"
+            )
+            if choice is None:
+                return False
+            if not choice:
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt")]
+                )
+                if not filename:
+                    return False
                 nwext = os.path.splitext(filename)[0]
                 if '_TXT' not in filename:
                     filename = nwext + '_TXT.txt'
                 self.current_study_file = filename
-            else:
-                return  # User cancelled
-        else:
-            filename = self.current_study_file
 
-        if filename:  # Now filename is guaranteed to be defined
-            with open(filename, 'w', encoding='utf-8-sig') as file:
-                content = self.study_textbox.get(1.0, tk.END)
-                file.write(content)
-            messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
+        with open(filename, 'w', encoding='utf-8-sig') as file:
+            file.write(self.study_textbox.get(1.0, tk.END))
+
+        messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
+        self.set_baseline('Study Text Box')
+        return True
 
     def clear_study_text(self):
         """Clear study text"""
         self.current_study_file = None
         self.study_textbox.delete(1.0, tk.END)
         self.current_study_file = None
+        self.set_baseline('Study Text Box')
 
     def load_translation(self):
         """Load translation file"""
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        if not filename:
+            return
 
         if filename.endswith("_TRA.txt") or "_TRA.txt" in filename:
             self.current_translation_file = filename  # Save the loaded filename
             self.translation_content_cleared = False  # Reset flag when file is loaded
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
-                self.translation_textbox.insert(tk.END, content)
+            self.translation_textbox.delete(1.0, tk.END)
+            self.translation_textbox.insert(tk.END, content)
+            self.set_baseline('Translation Box')
+            return
 
-        else:
-            messagebox.showwarning(
+        messagebox.showwarning(
             "Invalid File Type",
-            "The selected file is not a vocabulary file.\n\n"
+            "The selected file is not a translation file.\n\n"
             "Please select a file that ends with '_TRA.txt'.\n\n"
         )
-            return
 
     def save_translation(self):
         """Save translation to file.
@@ -3842,19 +3877,24 @@ Rules:
                         with open(filename, 'w', encoding='utf-8-sig') as file:
                             file.write(content)
                         messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+                        self.set_baseline('Translation Box')
+                        return True
                     except Exception as e:
                         messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
-                return
+                        return False
+                return False
             else:
                 # Content not cleared, save to the known file
                 try:
                     with open(self.current_translation_file, 'w', encoding='utf-8-sig') as file:
                         file.write(content)
                     messagebox.showinfo("Success", f"Translation saved to:\n{self.current_translation_file}")
+                    self.set_baseline('Translation Box')
+                    return True
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
-                return
-        
+                    return False
+
         # No known file, prompt for filename
         filename = filedialog.asksaveasfilename(
             defaultextension=".txt",
@@ -3871,20 +3911,176 @@ Rules:
                 with open(filename, 'w', encoding='utf-8-sig') as file:
                     file.write(content)
                 messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+                self.set_baseline('Translation Box')
+                return True
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+                return False
+        return False
 
-    def clear_translation(self):
-        """Clear translation"""
-        self.translation_content_cleared = True  # Set flag to indicate content was cleared
-        self.translation_textbox.delete(1.0, tk.END)
-        self.current_translation_file = None
+    def initialize_change_tracking(self):
+        """Initialize dirty tracking for the top-left text boxes."""
+        self.boxes = {
+            'Vocabulary (Current)': self.vocabulary_textbox,
+            'Study Text Box': self.study_textbox,
+            'Translation Box': self.translation_textbox,
+        }
+        self.dirty_boxes = {name: False for name in self.boxes}
+        self.baseline_contents = {name: box.get(1.0, tk.END) for name, box in self.boxes.items()}
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def reset_session(self):
-        """Reset session: clear all text boxes and reset file paths"""
-        self.clear_vocabulary()
-        self.clear_study_text()
-        self.clear_translation()
+        for name, textbox in self.boxes.items():
+            self.add_dirty_tracking(textbox, name)
+
+    def add_dirty_tracking(self, textbox, box_name):
+        textbox.bind('<<Modified>>', lambda event, name=box_name: self.on_text_modified(event, name))
+        textbox.edit_modified(False)
+
+    def on_text_modified(self, event, box_name):
+        textbox = event.widget
+        if textbox.edit_modified():
+            self.dirty_boxes[box_name] = True
+            textbox.edit_modified(False)
+
+    def reset_box_dirty(self, box_name):
+        if box_name in self.dirty_boxes:
+            self.dirty_boxes[box_name] = False
+            self.boxes[box_name].edit_modified(False)
+
+    def set_baseline(self, box_name):
+        if box_name in self.boxes:
+            self.baseline_contents[box_name] = self.boxes[box_name].get(1.0, tk.END)
+            self.reset_box_dirty(box_name)
+
+    def get_modified_top_boxes(self):
+        return [
+            name for name, box in self.boxes.items()
+            if self.dirty_boxes.get(name, False) or box.get(1.0, tk.END) != self.baseline_contents.get(name, '')
+        ]
+
+    def ask_save_disregard(self, box_name):
+        """Ask the user whether to Save, Save As, or Disregard changes for a box."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Unsaved changes in {box_name}")
+        dialog.configure(bg="#222")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+
+        tk.Label(dialog, text=f"{box_name} has unsaved changes.", bg="#222", fg="white", font=("Segoe UI", 11)).pack(padx=20, pady=(20, 10))
+        tk.Label(dialog, text="Do you want to save, save as a new file, or disregard changes?", bg="#222", fg="white", font=("Segoe UI", 10)).pack(padx=20, pady=(0, 15))
+
+        result = {'choice': None}
+
+        def choose(action):
+            result['choice'] = action
+            dialog.destroy()
+
+        button_frame = tk.Frame(dialog, bg="#222")
+        button_frame.pack(pady=(0, 20))
+
+        tk.Button(button_frame, text="Save", bg="#4CAF50", fg="black", width=10,
+                  command=lambda: choose('save')).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Save As", bg="#2196F3", fg="black", width=10,
+                  command=lambda: choose('save_as')).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Disregard", bg="#F44336", fg="black", width=10,
+                  command=lambda: choose('disregard')).pack(side=tk.LEFT, padx=5)
+
+        dialog.protocol("WM_DELETE_WINDOW", lambda: choose(None))
+        self.root.wait_window(dialog)
+        return result['choice']
+
+    def save_modified_box(self, box_name, save_as=False):
+        if box_name == 'Vocabulary (Current)':
+            return self.save_vocabulary_as() if save_as else self.save_vocabulary()
+        if box_name == 'Study Text Box':
+            return self.save_study_text_as() if save_as else self.save_study_text()
+        if box_name == 'Translation Box':
+            return self.save_translation_as() if save_as else self.save_translation()
+        return False
+
+    def save_vocabulary_as(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt")]
+        )
+        if not filename:
+            return False
+
+        nwext = os.path.splitext(filename)[0]
+        if '_VOC' not in filename:
+            filename = nwext + '_VOC.txt'
+        self.current_voc_file = filename
+        with open(filename, 'w', encoding='utf-8-sig') as file:
+            file.write(self.vocabulary_textbox.get(1.0, tk.END))
+        self.update_vocabulary_label_path()
+        self.set_baseline('Vocabulary (Current)')
+        return True
+
+    def save_study_text_as(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt")]
+        )
+        if not filename:
+            return False
+
+        nwext = os.path.splitext(filename)[0]
+        if '_TXT' not in filename:
+            filename = nwext + '_TXT.txt'
+        self.current_study_file = filename
+        with open(filename, 'w', encoding='utf-8-sig') as file:
+            file.write(self.study_textbox.get(1.0, tk.END))
+        messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
+        self.set_baseline('Study Text Box')
+        return True
+
+    def save_translation_as(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt")]
+        )
+        if not filename:
+            return False
+
+        nwext = os.path.splitext(filename)[0]
+        if '_TRA' not in filename:
+            filename = nwext + '_TRA.txt'
+        self.current_translation_file = filename
+        with open(filename, 'w', encoding='utf-8-sig') as file:
+            file.write(self.translation_textbox.get(1.0, tk.END))
+        messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+        self.translation_content_cleared = False
+        self.set_baseline('Translation Box')
+        return True
+
+    def process_unsaved_changes(self):
+        modified_boxes = self.get_modified_top_boxes()
+        if not modified_boxes:
+            return True
+
+        for box_name in modified_boxes:
+            choice = self.ask_save_disregard(box_name)
+            if choice is None:
+                return False
+            if choice == 'save':
+                if not self.save_modified_box(box_name, save_as=False):
+                    return False
+            elif choice == 'save_as':
+                if not self.save_modified_box(box_name, save_as=True):
+                    return False
+            elif choice == 'disregard':
+                continue
+
+        return True
+
+    def confirm_reset_session(self):
+        if self.process_unsaved_changes():
+            self.reset_session()
+
+    def on_close(self):
+        if self.process_unsaved_changes():
+            self.root.destroy()
 
     def beautify_vocabulary(self):
         """Beautify vocabulary: remove preceding numbers and duplicates"""
@@ -4025,6 +4221,81 @@ Rules:
         except Exception:
             pass
         self.current_voc_file = None
+        self.set_baseline('Vocabulary (Current)')
+
+    def confirm_clear_vocabulary(self):
+        if not self.vocabulary_textbox.get(1.0, tk.END).strip():
+            self.clear_vocabulary()
+            return
+
+        if self.vocabulary_textbox.get(1.0, tk.END) == self.baseline_contents.get('Vocabulary (Current)', ''):
+            self.clear_vocabulary()
+            return
+
+        choice = self.ask_save_disregard('Vocabulary (Current)')
+        if choice is None:
+            return
+        if choice == 'save':
+            if not self.save_modified_box('Vocabulary (Current)', save_as=False):
+                return
+        elif choice == 'save_as':
+            if not self.save_modified_box('Vocabulary (Current)', save_as=True):
+                return
+        self.clear_vocabulary()
+
+    def clear_study_text(self):
+        """Clear study text"""
+        self.current_study_file = None
+        self.study_textbox.delete(1.0, tk.END)
+        self.current_study_file = None
+        self.set_baseline('Study Text Box')
+
+    def confirm_clear_study_text(self):
+        if not self.study_textbox.get(1.0, tk.END).strip():
+            self.clear_study_text()
+            return
+
+        if self.study_textbox.get(1.0, tk.END) == self.baseline_contents.get('Study Text Box', ''):
+            self.clear_study_text()
+            return
+
+        choice = self.ask_save_disregard('Study Text Box')
+        if choice is None:
+            return
+        if choice == 'save':
+            if not self.save_modified_box('Study Text Box', save_as=False):
+                return
+        elif choice == 'save_as':
+            if not self.save_modified_box('Study Text Box', save_as=True):
+                return
+        self.clear_study_text()
+
+    def clear_translation(self):
+        """Clear translation"""
+        self.translation_content_cleared = True  # Set flag to indicate content was cleared
+        self.translation_textbox.delete(1.0, tk.END)
+        self.current_translation_file = None
+        self.set_baseline('Translation Box')
+
+    def confirm_clear_translation(self):
+        if not self.translation_textbox.get(1.0, tk.END).strip():
+            self.clear_translation()
+            return
+
+        if self.translation_textbox.get(1.0, tk.END) == self.baseline_contents.get('Translation Box', ''):
+            self.clear_translation()
+            return
+
+        choice = self.ask_save_disregard('Translation Box')
+        if choice is None:
+            return
+        if choice == 'save':
+            if not self.save_modified_box('Translation Box', save_as=False):
+                return
+        elif choice == 'save_as':
+            if not self.save_modified_box('Translation Box', save_as=True):
+                return
+        self.clear_translation()
 
     def capture_text(self):
         """Translate text using AI"""
