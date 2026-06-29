@@ -136,7 +136,8 @@ class VocabularyApp:
         self.total_questions = 0
         self.correct_answers = 0
         self.flip_mode = False
-        self.left_section_font = tkFont.Font(family="Helvetica", size=10, weight="normal")
+        self.left_section_font = tkFont.Font(family="Segoe UI", size=10, weight="normal")
+        self.textbox_font = tkFont.Font(family="Segoe UI", size=11, weight="normal")
         self.conversation_history = []
         self.divert = 0
         self.load_current_voc = 0
@@ -1535,13 +1536,13 @@ class VocabularyApp:
         left_frame.pack(side=tk.LEFT, fill=tk.Y)
         
         # Create textboxes
-        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=9, label_font=self.left_section_font, add_buttons=False)
-        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=10, label_font=self.left_section_font, add_buttons=True)
+        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=7, label_font=self.left_section_font, textbox_font=self.textbox_font, add_buttons=False)
+        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=8, label_font=self.left_section_font, textbox_font=self.textbox_font, add_buttons=True)
         tk.Label(left_frame, text="In the Study Text Box: double-click on a German noun to see it declined. Shift + Right click on mouse to find word in Vocabulary.", fg="cyan", bg="#222").pack(anchor='w')
         self.study_textbox.bind('<Double-Button-1>', self.on_study_text_double_click)
         self.study_textbox.bind('<Shift-Button-3>', self.on_study_text_shift_right_click)
-        self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=9, label_font=self.left_section_font, add_buttons=True)
-        self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=5, label_font=self.left_section_font, add_buttons=False)
+        self.translation_textbox = self.create_labeled_textbox(left_frame, "Translation Box:", True, height=7, label_font=self.left_section_font, textbox_font=self.textbox_font, add_buttons=True)
+        self.input_textbox = self.create_labeled_textbox(left_frame, "Prompt the AI by writing below", True, height=6, label_font=self.left_section_font, add_buttons=False)
 
         # Add the AI prompt buttons
         self.prompt_ai_button = ttk.Button(
@@ -1550,7 +1551,7 @@ class VocabularyApp:
             style='SmallPurple.TButton',
             command=self.prompt_inputbox
         )
-        self.prompt_ai_button.pack(side='left', padx=(10, 3), pady=3)
+        self.prompt_ai_button.pack(side='left', padx=(10, 3), pady=1)
 
         self.eval_answer_btn = ttk.Button(
             left_frame,
@@ -1559,14 +1560,14 @@ class VocabularyApp:
             command=self.handle_evaluation,  # unified handler for reading/listening
             state="disabled"
         )
-        self.eval_answer_btn.pack(side='left', padx=(10, 3), pady=3)
+        self.eval_answer_btn.pack(side='left', padx=(10, 3), pady=1)
 
         ttk.Button(
             left_frame,
             text="Clear Prompt",
             style='SmallRed.TButton',
             command=self.clear_input_textbox
-        ).pack(side='left', padx=3, pady=3)
+        ).pack(side='left', padx=3, pady=1)
 
         ttk.Button(
             left_frame,
@@ -1907,10 +1908,10 @@ class VocabularyApp:
         # AI Responses to prompts
         self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=11, label_font="Helvetica")
 
-    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", add_buttons=False):
+    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False):
         """Create a labeled textbox with optional scrollbar and highlight buttons"""
         frame = tk.Frame(parent, bg="#222")
-        frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+        frame.pack(fill=tk.X, padx=10, pady=(6, 0))
         
         label = tk.Label(frame, text=label_text, bg="#222", fg="gold", font=label_font)
         # Keep a reference to the vocabulary label so we can update it with the file path
@@ -1921,12 +1922,13 @@ class VocabularyApp:
             pass
         label.pack(anchor="w")
         
+        active_textbox_font = textbox_font if textbox_font is not None else label_font
         if scrollbar:
             textbox = scrolledtext.ScrolledText(frame, height=height, bg="#333", fg="white", 
-                                            insertbackground="white", font=label_font, wrap="word")
+                                            insertbackground="white", font=active_textbox_font, wrap="word")
         else:
             textbox = tk.Text(frame, height=height, bg="#333", fg="white", 
-                            insertbackground="white", font=label_font, wrap="word")
+                            insertbackground="white", font=active_textbox_font, wrap="word")
         
         textbox.pack(fill=tk.X, pady=(5, 0))
         
