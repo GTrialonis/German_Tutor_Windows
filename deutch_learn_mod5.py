@@ -52,11 +52,15 @@ def configure_openai():
         exit()
 
 class Tooltip:
-    """Simple tooltip class for tkinter widgets."""
-    def __init__(self, widget, text):
+    """Simple tooltip class for tkinter widgets.
+
+    Optional `position` argument may be 'below' (default) or 'above'.
+    """
+    def __init__(self, widget, text, position='below'):
         self.widget = widget
         self.text = text
         self.tooltip = None
+        self.position = position
         widget.bind("<Enter>", self.show_tooltip)
         widget.bind("<Leave>", self.hide_tooltip)
     
@@ -64,11 +68,12 @@ class Tooltip:
         """Display the tooltip."""
         if self.tooltip:
             return
-        
-        # Create tooltip window
-        self.tooltip = tk.Toplevel(self.widget)
+
+        # Create tooltip window as a child of the root window and hide it until positioned
+        self.tooltip = tk.Toplevel(self.widget.winfo_toplevel())
+        self.tooltip.withdraw()
         self.tooltip.wm_overrideredirect(True)
-        
+
         # Create label with text
         label = tk.Label(
             self.tooltip,
@@ -82,20 +87,35 @@ class Tooltip:
             pady=3
         )
         label.pack()
-        
-        # Update to get actual size
+
+        # Update widget and tooltip geometry first
+        self.widget.update_idletasks()
         self.tooltip.update_idletasks()
+
         tooltip_height = self.tooltip.winfo_height()
-        
-        # Position tooltip below the widget
-        x = self.widget.winfo_rootx() + 10
-        # Use the widget height to place the tooltip just below it
+        tooltip_width = self.tooltip.winfo_width()
+        widget_x = self.widget.winfo_rootx()
+        widget_y = self.widget.winfo_rooty()
+        widget_width = self.widget.winfo_width()
+        widget_height = self.widget.winfo_height()
+
+        x = widget_x + (widget_width - tooltip_width) // 2
+        x = max(0, x)
+
+        if self.position == 'above':
+            y = widget_y - tooltip_height - 4
+            if y < 0:
+                y = widget_y + widget_height + 4
+        else:
+            y = widget_y + widget_height + 4
+
+        self.tooltip.geometry(f"+{x}+{y}")
+        self.tooltip.deiconify()
+        self.tooltip.lift()
         try:
-            widget_height = self.widget.winfo_height()
+            self.tooltip.attributes('-topmost', True)
         except Exception:
-            widget_height = 0
-        y = self.widget.winfo_rooty() + widget_height + 5
-        self.tooltip.wm_geometry(f"+{x}+{y}")
+            pass
     
     def hide_tooltip(self, event=None):
         """Hide the tooltip."""
@@ -1514,7 +1534,7 @@ class VocabularyApp:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
             )
@@ -1584,7 +1604,7 @@ class VocabularyApp:
             command=self.confirm_reset_session
         )
         new_session_btn.pack(side='left', padx=3, pady=3)
-        Tooltip(new_session_btn, "Click for a fresh start of the program")
+        Tooltip(new_session_btn, "Click for a fresh start of the program", position='above')
 
     def create_middle_section(self):
         """Create the middle section with control buttons"""
@@ -2076,7 +2096,7 @@ class VocabularyApp:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.6,
                 max_tokens=450,
@@ -2233,7 +2253,7 @@ class VocabularyApp:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are a German grammar expert. Provide concise, accurate noun information."},
                     {"role": "user", "content": prompt}
@@ -2373,7 +2393,7 @@ Rules:
             Example: oft = often, frequently
 6) All output should be in plain text."""
 
-            response = client.chat.completions.create(model="gpt-5.5",
+            response = client.chat.completions.create(model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant for language study."},
                 {"role": "user", "content": f"{prompt}\n\n{content}"}
@@ -4077,6 +4097,21 @@ Rules:
     def confirm_reset_session(self):
         if self.process_unsaved_changes():
             self.reset_session()
+
+    def reset_session(self):
+        """Reset session: clear the main text boxes and reset file paths."""
+        try:
+            self.clear_vocabulary()
+        except Exception:
+            pass
+        try:
+            self.clear_study_text()
+        except Exception:
+            pass
+        try:
+            self.clear_translation()
+        except Exception:
+            pass
 
     def on_close(self):
         if self.process_unsaved_changes():
