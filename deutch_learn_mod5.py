@@ -2378,7 +2378,7 @@ class VocabularyApp:
             Frühling, Sommer, Herbst, Winter, Wasser, Feuer, Erde, Luft, Himmel, Sonne, Mond, Stern, Tag, Nacht, Zeit, Jahr, heute, morgen, gestern, immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht, 
             gute, großer, kleine, schön, alt, jung, neu, lang, kurz, schnell, langsam, hoch, niedrig, warm, kalt, Dorf, Geschichte, Mensch, Leben, Arbeit, Stadt, Land, Auto, Buch, Musik, Sprache, Frage, Antwort, Weg, Hand, Auge, Kopf, Herz,
             Freund, Liebe, Familie, Schule, Universität, Lehrer, Schüler, Essen, Trinken, Geld, Kleidung, Haus, Baum, Tier, Hund, Katze, Vogel, Fisch, Straße, Brücke, Berg, Fluss, Meer, Himmel.
-            immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht
+            immer, oft, selten, manchmal, viel, wenig, mehr, weniger, gut, schlecht, man,
 Rules: 
 1) All output should be in plain text, i.e. list entries should not be preceded by numbers, asterisks, bullets, etc.
 2) for any verb form or type you encounter, return the three basic forms in German: Infinitiv, [Präteritum, Partizip II] = translation1, translation2, translation3, for example: if you encounter 'sprichst' or 'sprachen' or any other form of the same verb, you output: sprechen, [sprach, gesprochen] = speak, say, relate.
