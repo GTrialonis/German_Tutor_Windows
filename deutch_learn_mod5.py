@@ -2307,9 +2307,9 @@ class VocabularyApp:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=self.conversation_history,
-                temperature=0.7,
+                reasoning_effort="medium"  # Choose from: "low", "medium", "high", or "xhigh"
             )
             answer = response.choices[0].message.content.strip()
 
