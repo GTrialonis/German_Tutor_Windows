@@ -14,6 +14,10 @@ import tempfile
 import time
 import re
 import json
+import ctypes
+import textwrap
+from ctypes import wintypes
+import subprocess
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -148,7 +152,10 @@ class VocabularyApp:
         self.recent_voc_files = []
         self.recent_voc_file_path = r"C:\Users\George\Desktop\German_Study_Files\recent-VOC-files.txt"
         self.load_recent_voc_files()
+        self.study_text_cleared = False  # Track if study text content was cleared
+        self.study_text_append_target = None
         self.translation_content_cleared = False  # Track if translation content was cleared
+        self.translation_append_target = None
         self.current_example_sentences_file = None
         self.current_ai_responses_file = None
         self.score = 0
@@ -235,7 +242,7 @@ class VocabularyApp:
             'SmallGoldBrown.TButton': {'background': '#AA8800', 'foreground': 'black'},
             'SmallLightPurple.TButton': {'background': '#cbb0e0', 'foreground': 'black'},
             'SmallOrange.TButton': {'background': 'orange', 'foreground': 'black'},
-            'SmallDarkBlue.TButton': {'background': '#005588', 'foreground': 'black'},
+            'SmallBrightAqua.TButton': {'background': "#0AF0F0", 'foreground': 'black'},
             'SmallGrayBlue.TButton': {'background': '#9DC1E4', 'foreground': 'black'},
             'SmallDarkOlive.TButton': {'background': '#95C068', 'foreground': 'black'},
             'SmallOliveGreen.TButton': {'background': '#95946A', 'foreground': 'black'},
@@ -302,7 +309,7 @@ class VocabularyApp:
 
     # === CORE FUNCTIONALITY METHODS ===
 
-    def ask_chatgpt(self, prompt: str, model_name="gpt-5.5", temperature=0.7) -> str:
+    def ask_chatgpt(self, prompt: str, model_name="gpt-5.5") -> str:
         """Send prompt to ChatGPT and return response"""
         resp = self.client.chat.completions.create(
             model=model_name,
@@ -310,7 +317,6 @@ class VocabularyApp:
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=temperature,
         )
         return resp.choices[0].message.content.strip()
 
@@ -1637,7 +1643,10 @@ class VocabularyApp:
         study_btn_frame.pack(pady=(1, 1)) # tighter block space for more compact UI
 
         ttk.Button(study_btn_frame, text="LOAD-TXT", style='SmallBlue.TButton', command=self.load_study_text).pack(pady=1)
-        ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text).pack(pady=1)
+        self.study_save_button = ttk.Button(study_btn_frame, text="SAVE-TXT", style='SmallGreen.TButton', command=self.save_study_text)
+        self.study_save_button.pack(pady=1)
+        self.study_save_tooltip = Tooltip(self.study_save_button, "Save the current content or append after clearing the box.")
+        self.update_study_save_button_state()
         copy_txt_btn = ttk.Button(study_btn_frame, text="COPY-TXT", style='SmallBrownish.TButton', command=self.copy_study_text)
         copy_txt_btn.pack(pady=1)
         Tooltip(copy_txt_btn, "Click to copy the entire text or the selected text.")
@@ -1660,16 +1669,23 @@ class VocabularyApp:
         translation_btn_frame.pack(pady=(8, 0))
 
         ttk.Button(translation_btn_frame, text="LOAD-TRA", style='SmallBlue.TButton', command=self.load_translation).pack(pady=2)
-        ttk.Button(translation_btn_frame, text="SAVE-TRA", style='SmallGreen.TButton', command=self.save_translation).pack(pady=2)
+        self.translation_save_button = ttk.Button(translation_btn_frame, text="SAVE-TRA", style='SmallGreen.TButton', command=self.save_translation)
+        self.translation_save_button.pack(pady=2)
+        self.translation_save_tooltip = Tooltip(self.translation_save_button, "Save the current content or append after clearing the box.")
+        self.update_translation_save_button_state()
         ttk.Button(translation_btn_frame, text="CLR-TRA", style='SmallRed.TButton', command=self.confirm_clear_translation).pack(pady=2)
         ttk.Button(translation_btn_frame, text="NOTES", style='SmallGoldBrown.TButton', command=self.add_notes).pack(pady=2)
         copy_tra_btn = ttk.Button(translation_btn_frame, text="COPY-TRA", style='SmallBrownish.TButton', command=self.copy_translation_text)
         copy_tra_btn.pack(pady=2)
         Tooltip(copy_tra_btn, "Click to copy the entire text or selected text from Translation Box.")
         
+        # Print button for textboxes
+        print_btn = ttk.Button(middle_frame, text="PRINT", style='SmallBrightAqua.TButton', command=self.show_print_popup)
+        print_btn.pack(pady=(15, 3))
+
         # Group 4: AI Response Buttons
         ai_responses_label = tk.Label(middle_frame, text="AI Responses", bg="#222", fg="gold", font=("Arial", 12, "bold"))
-        ai_responses_label.pack(pady=(40, 5))
+        ai_responses_label.pack(pady=(10, 5))
         
         ai_responses_middle_btn_frame = tk.Frame(middle_frame, bg="#222")
         ai_responses_middle_btn_frame.pack(pady=(0, 0))
@@ -1895,7 +1911,7 @@ class VocabularyApp:
 
         # Answer Input
         tk.Label(right_frame, text="Type your answer below and then press the ENTER key. 'to' is added before the English verbs", fg="gold", bg="#222").pack(anchor='w')
-        tk.Label(right_frame, text="For the 'Next Word' hold down SHIFT and press the ENTER key", fg="cyan", bg="#222").pack(anchor='w')
+        tk.Label(right_frame, text="Click 'Next Word' or hold down SHIFT and hit ENTER while the cursor is in the input field below.", fg="cyan", bg="#222").pack(anchor='w')
         self.answer_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.answer_entry.pack(fill=tk.X)
         self.answer_entry.bind("<Return>", self.check_answer)
@@ -1928,6 +1944,351 @@ class VocabularyApp:
 
         # AI Responses to prompts
         self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=11, label_font="Helvetica")
+
+    def show_print_popup(self):
+        """Show popup to choose which textbox to print."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Print Textbox")
+        popup.configure(bg="#222")
+        popup.geometry("360x190")
+        popup.transient(self.root)
+        popup.grab_set()
+
+        popup.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        tk.Label(popup, text="Select textbox to print:", bg="#222", fg="white", font=("Arial", 11, "bold")).pack(pady=(15, 8))
+
+        choice_var = tk.StringVar(value="Vocabulary")
+        options = [
+            ("Vocabulary", "Vocabulary"),
+            ("Study Text", "Study Text"),
+            ("Translation", "Translation")
+        ]
+
+        for text, value in options:
+            rb = tk.Radiobutton(popup, text=text, variable=choice_var, value=value,
+                                bg="#222", fg="white", selectcolor="#444", activebackground="#222",
+                                activeforeground="white", font=("Arial", 10))
+            rb.pack(anchor="w", padx=20, pady=2)
+        # Font size chooser
+        font_frame = tk.Frame(popup, bg="#222")
+        font_frame.pack(fill=tk.X, padx=20, pady=(6, 0))
+        tk.Label(font_frame, text="Font size:", bg="#222", fg="white").pack(side=tk.LEFT)
+        font_var = tk.IntVar(value=12)
+        for fs in (10, 12, 14, 16, 18):
+            tk.Radiobutton(font_frame, text=str(fs), variable=font_var, value=fs, bg="#222", fg="white", selectcolor="#444").pack(side=tk.LEFT, padx=6)
+
+        button_frame = tk.Frame(popup, bg="#222")
+        button_frame.pack(fill=tk.X, pady=15, padx=20)
+
+        ttk.Button(
+            button_frame,
+            text="Print",
+            style='SmallGreen.TButton',
+            command=lambda: [self.print_selected_textbox(choice_var.get(), popup, font_var.get(), False)]
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
+
+        ttk.Button(
+            button_frame,
+            text="Open in Notepad",
+            style='SmallBlue.TButton',
+            command=lambda: [self.open_in_notepad(choice_var.get(), popup)]
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+
+        ttk.Button(
+            button_frame,
+            text="Export to PDF",
+            style='SmallWhite.TButton',
+            command=lambda: [
+                messagebox.showinfo("Export to PDF",
+                                    "When the printer dialog appears, choose 'Microsoft Print to PDF' and press Print. You will be prompted for a filename.",
+                                    parent=self.root),
+                self.print_selected_textbox(choice_var.get(), popup, font_var.get(), True)
+            ]
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+
+        ttk.Button(
+            button_frame,
+            text="Cancel",
+            style='SmallRed.TButton',
+            command=popup.destroy
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
+
+        popup.protocol("WM_DELETE_WINDOW", popup.destroy)
+
+    def print_selected_textbox(self, selection, popup_window=None, font_size=12, export_pdf=False):
+        """Print the selected textbox content to the default Windows printer.
+
+        Parameters:
+        - selection: which textbox to print
+        - popup_window: popup to destroy
+        - font_size: point size for printing
+        - export_pdf: if True, user is expected to select 'Microsoft Print to PDF'
+        """
+        popup_window and popup_window.destroy()
+
+        if selection == "Vocabulary":
+            content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+            title = "Vocabulary"
+        elif selection == "Study Text":
+            content = self.study_textbox.get(1.0, tk.END).strip()
+            title = "Study Text"
+        elif selection == "Translation":
+            content = self.translation_textbox.get(1.0, tk.END).strip()
+            title = "Translation"
+        else:
+            return
+
+        if not content:
+            messagebox.showwarning("Nothing to Print", f"The {title} box is empty.", parent=self.root)
+            return
+
+        try:
+            if os.name == 'nt':
+                if export_pdf:
+                    # Inform the user; actual PDF saving is handled by the system printer driver
+                    messagebox.showinfo("Export to PDF",
+                                        "Select 'Microsoft Print to PDF' in the printer dialog and then press Print. You will be prompted for a filename.",
+                                        parent=self.root)
+                self._print_text_with_dialog(title, content, font_point=font_size)
+            else:
+                messagebox.showinfo("Print Not Supported", "Printing is currently supported only on Windows.", parent=self.root)
+        except Exception as e:
+            # Offer Notepad fallback so the user can print using their preferred settings
+            try:
+                open_in_notepad = messagebox.askyesno("Print Error",
+                    f"Could not print {title} text: {e}\n\nOpen in Notepad to print manually?",
+                    parent=self.root)
+                if open_in_notepad:
+                    self.open_in_notepad(selection, None)
+            except Exception:
+                messagebox.showerror("Print Error", f"Could not print {title} text: {e}", parent=self.root)
+
+    def _print_text_with_dialog(self, title, content, font_point=12):
+        """Show the native Windows print dialog and print the supplied text."""
+        PD_RETURNDC = 0x00000100
+        PD_COLLATE = 0x00000010
+
+        class PRINTDLGW(ctypes.Structure):
+            _fields_ = [
+                ("lStructSize", wintypes.DWORD),
+                ("hwndOwner", wintypes.HWND),
+                ("hDevMode", wintypes.HGLOBAL),
+                ("hDevNames", wintypes.HGLOBAL),
+                ("hDC", wintypes.HDC),
+                ("Flags", wintypes.DWORD),
+                ("nFromPage", wintypes.WORD),
+                ("nToPage", wintypes.WORD),
+                ("nMinPage", wintypes.WORD),
+                ("nMaxPage", wintypes.WORD),
+                ("nCopies", wintypes.WORD),
+                ("hInstance", wintypes.HINSTANCE),
+                ("lCustData", wintypes.LPARAM),
+                ("lpfnPrintHook", wintypes.LPVOID),
+                ("lpfnSetupHook", wintypes.LPVOID),
+                ("lpPrintTemplateName", wintypes.LPCWSTR),
+                ("lpSetupTemplateName", wintypes.LPCWSTR),
+                ("hPrintTemplate", wintypes.HGLOBAL),
+                ("hSetupTemplate", wintypes.HGLOBAL)
+            ]
+
+        def _free_global_handle(handle):
+            if handle:
+                ctypes.windll.kernel32.GlobalFree(handle)
+
+        class DOCINFOW(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.INT),
+                ("lpszDocName", wintypes.LPCWSTR),
+                ("lpszOutput", wintypes.LPCWSTR),
+                ("lpszDatatype", wintypes.LPCWSTR),
+                ("fwType", wintypes.DWORD)
+            ]
+
+        class TEXTMETRICW(ctypes.Structure):
+            _fields_ = [
+                ("tmHeight", wintypes.LONG),
+                ("tmAscent", wintypes.LONG),
+                ("tmDescent", wintypes.LONG),
+                ("tmInternalLeading", wintypes.LONG),
+                ("tmExternalLeading", wintypes.LONG),
+                ("tmAveCharWidth", wintypes.LONG),
+                ("tmMaxCharWidth", wintypes.LONG),
+                ("tmWeight", wintypes.LONG),
+                ("tmOverhang", wintypes.LONG),
+                ("tmDigitizedAspectX", wintypes.LONG),
+                ("tmDigitizedAspectY", wintypes.LONG),
+                ("tmFirstChar", wintypes.WCHAR),
+                ("tmLastChar", wintypes.WCHAR),
+                ("tmDefaultChar", wintypes.WCHAR),
+                ("tmBreakChar", wintypes.WCHAR),
+                ("tmItalic", wintypes.BYTE),
+                ("tmUnderlined", wintypes.BYTE),
+                ("tmStruckOut", wintypes.BYTE),
+                ("tmPitchAndFamily", wintypes.BYTE),
+                ("tmCharSet", wintypes.BYTE)
+            ]
+
+        def _create_font(hdc, point=12):
+            """Create a printer-scaled font based on point size and printer DPI."""
+            LOGPIXELSY = 90
+            try:
+                dpi_y = ctypes.windll.gdi32.GetDeviceCaps(hdc, LOGPIXELSY)
+                if dpi_y <= 0:
+                    dpi_y = 300
+            except Exception:
+                dpi_y = 300
+
+            # height in logical units for CreateFont: negative of point size converted to device units
+            height = -int(point * dpi_y / 72)
+            return ctypes.windll.gdi32.CreateFontW(
+                height, 0, 0, 0, 400,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                "Arial"
+            )
+
+        def _wrap_text(text, max_chars):
+            wrapped_lines = []
+            for raw_line in text.splitlines():
+                if not raw_line:
+                    wrapped_lines.append("")
+                else:
+                    wrapped_lines.extend(textwrap.wrap(
+                        raw_line,
+                        width=max_chars,
+                        replace_whitespace=False,
+                        drop_whitespace=False,
+                        break_long_words=True,
+                        break_on_hyphens=False
+                    ))
+            return wrapped_lines
+
+        def _doc_info(title_text):
+            info = DOCINFOW()
+            info.cbSize = ctypes.sizeof(DOCINFOW)
+            info.lpszDocName = title_text
+            info.lpszOutput = None
+            info.lpszDatatype = None
+            info.fwType = 0
+            return info
+
+        pd = PRINTDLGW()
+        pd.lStructSize = ctypes.sizeof(PRINTDLGW)
+        pd.hwndOwner = self.root.winfo_id() if hasattr(self.root, 'winfo_id') else 0
+        pd.Flags = PD_RETURNDC | PD_COLLATE
+
+        result = ctypes.windll.comdlg32.PrintDlgW(ctypes.byref(pd))
+        if not result:
+            error = ctypes.windll.comdlg32.CommDlgExtendedError()
+            if error != 0:
+                raise RuntimeError(f"Print dialog failed with error code {error}.")
+            return
+
+        hdc = pd.hDC
+        if not hdc:
+            raise RuntimeError("Printer device context was not obtained.")
+
+        # Create a printer-aware font and select into DC
+        font = _create_font(hdc, point=font_point)
+        old_font = ctypes.windll.gdi32.SelectObject(hdc, font)
+
+        try:
+            text_metrics = TEXTMETRICW()
+            ctypes.windll.gdi32.GetTextMetricsW(hdc, ctypes.byref(text_metrics))
+            line_height = text_metrics.tmHeight + text_metrics.tmExternalLeading
+            if line_height <= 0:
+                line_height = 18
+
+            HORZRES = ctypes.windll.gdi32.GetDeviceCaps(hdc, 8)
+            VERTRES = ctypes.windll.gdi32.GetDeviceCaps(hdc, 10)
+            left_margin = 100
+            top_margin = 100
+            right_margin = 100
+            bottom_margin = 100
+            printable_width = max(100, HORZRES - left_margin - right_margin)
+            printable_height = max(100, VERTRES - top_margin - bottom_margin)
+
+            sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            size = wintypes.SIZE()
+            ctypes.windll.gdi32.GetTextExtentPoint32W(hdc, sample_text, len(sample_text), ctypes.byref(size))
+            avg_char_width = max(1, (size.cx + len(sample_text) - 1) // len(sample_text))
+            max_chars = max(40, printable_width // avg_char_width)
+
+            lines = _wrap_text(content, max_chars)
+            lines_per_page = max(1, printable_height // line_height)
+
+            doc_info = _doc_info(title)
+            if ctypes.windll.gdi32.StartDocW(hdc, ctypes.byref(doc_info)) <= 0:
+                raise RuntimeError("Failed to start print job.")
+
+            for start in range(0, len(lines), lines_per_page):
+                if ctypes.windll.gdi32.StartPage(hdc) <= 0:
+                    raise RuntimeError("Failed to start print page.")
+
+                for line_index, line in enumerate(lines[start:start + lines_per_page]):
+                    y_pos = top_margin + line_index * line_height
+                    ctypes.windll.gdi32.ExtTextOutW(hdc, left_margin, y_pos, 0, None, line, len(line), None)
+
+                if ctypes.windll.gdi32.EndPage(hdc) <= 0:
+                    raise RuntimeError("Failed to end print page.")
+
+            if ctypes.windll.gdi32.EndDoc(hdc) <= 0:
+                raise RuntimeError("Failed to end print job.")
+
+            messagebox.showinfo("Printing", f"Sent {title} text to the selected printer.", parent=self.root)
+        finally:
+            ctypes.windll.gdi32.SelectObject(hdc, old_font)
+            ctypes.windll.gdi32.DeleteObject(font)
+            ctypes.windll.gdi32.DeleteDC(hdc)
+            _free_global_handle(pd.hDevMode)
+            _free_global_handle(pd.hDevNames)
+
+    def _cleanup_temp_file(self, file_path):
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+
+    def open_in_notepad(self, selection, popup_window=None):
+        """Write selected textbox content to a temp file and open it in Notepad."""
+        popup_window and popup_window.destroy()
+
+        if selection == "Vocabulary":
+            content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+            title = "Vocabulary"
+        elif selection == "Study Text":
+            content = self.study_textbox.get(1.0, tk.END).strip()
+            title = "Study Text"
+        elif selection == "Translation":
+            content = self.translation_textbox.get(1.0, tk.END).strip()
+            title = "Translation"
+        else:
+            return
+
+        if not content:
+            messagebox.showwarning("Nothing to Open", f"The {title} box is empty.", parent=self.root)
+            return
+
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tf:
+                tf.write(content)
+                temp_path = tf.name
+
+            # Open with Notepad so user can set preferences and print normally
+            try:
+                subprocess.Popen(["notepad.exe", temp_path])
+            except Exception:
+                # Fallback to default opener
+                os.startfile(temp_path)
+
+            # Schedule temp file cleanup in 10 minutes
+            threading.Timer(600.0, self._cleanup_temp_file, args=(temp_path,)).start()
+        except Exception as e:
+            messagebox.showerror("Open Error", f"Could not open in Notepad: {e}", parent=self.root)
 
     def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False):
         """Create a labeled textbox with optional scrollbar and highlight buttons"""
@@ -1997,7 +2358,7 @@ class VocabularyApp:
                 ttk.Button(
                     button_frame,
                     text="Resume Reading",
-                    style='SmallDarkBlue.TButton',
+                    style='SmallBrightAqua.TButton',
                     command=self.resume_reading_session
                 ).pack(side='left', padx=3, pady=3)
                 
@@ -2309,7 +2670,7 @@ class VocabularyApp:
             response = self.client.chat.completions.create(
                 model="gpt-5.5",
                 messages=self.conversation_history,
-                reasoning_effort="medium"  # Choose from: "low", "medium", "high", or "xhigh"
+                reasoning_effort="high"  # Choose from: "low", "medium", "high", or "xhigh"
             )
             answer = response.choices[0].message.content.strip()
 
@@ -2973,7 +3334,7 @@ Rules:
             full_prompt = f"{prompt}\n\n{content}"
 
             # Send to ChatGPT
-            translated_text = self.ask_chatgpt(full_prompt, model_name="gpt-4o", temperature=0.3)
+            translated_text = self.ask_chatgpt(full_prompt, model_name="gpt-5.5")
 
             # Display the result
             self.translation_textbox.delete(1.0, tk.END)
@@ -3279,7 +3640,7 @@ Rules:
 
 
         try:
-            translated_word = self.ask_chatgpt(full_prompt, model_name="gpt-4o", temperature=0.3)
+            translated_word = self.ask_chatgpt(full_prompt, model_name="gpt-5.5")
             if self.divert > 0:
                 self.ai_responses_textbox.insert(tk.END, translated_word + "\n")
                 self.divert = 0
@@ -3761,6 +4122,42 @@ Rules:
                 parent=self.root
             )
 
+    def update_study_save_button_state(self):
+        if hasattr(self, 'study_save_button'):
+            self.study_save_button.config(text="SAVE/APP" if getattr(self, 'study_text_cleared', False) else "SAVE-TXT")
+
+    def update_translation_save_button_state(self):
+        if hasattr(self, 'translation_save_button'):
+            self.translation_save_button.config(text="SAVE/APP" if getattr(self, 'translation_content_cleared', False) else "SAVE-TRA")
+
+    def ensure_text_filename(self, filename, suffix):
+        if not filename:
+            return ""
+        root, ext = os.path.splitext(filename)
+        if not ext:
+            filename = f"{filename}.txt"
+            root, ext = os.path.splitext(filename)
+        if ext.lower() != '.txt':
+            filename = f"{root}.txt"
+            root, _ = os.path.splitext(filename)
+        if suffix not in os.path.basename(filename):
+            filename = f"{root}{suffix}.txt"
+        return filename
+
+    def append_content_to_file(self, filename, content):
+        if not filename:
+            raise ValueError("No filename provided")
+
+        payload = content
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            with open(filename, 'r', encoding='utf-8-sig') as file:
+                existing_content = file.read()
+            if existing_content and not existing_content.endswith("\n") and payload and not payload.startswith("\n"):
+                payload = "\n" + payload
+
+        with open(filename, 'a', encoding='utf-8-sig') as file:
+            file.write(payload)
+
     def load_study_text(self):
         """Load study text file"""
         filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
@@ -3769,6 +4166,8 @@ Rules:
 
         if filename.endswith("_TXT.txt") or "_TXT.txt" in filename:
             self.current_study_file = filename
+            self.study_text_cleared = False
+            self.study_text_append_target = None
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
 
@@ -3782,6 +4181,7 @@ Rules:
             self.study_textbox.insert(tk.END, cleaned_content)
             self.reset_box_dirty('Study Text Box')
             self.set_baseline('Study Text Box')
+            self.update_study_save_button_state()
             return
 
         messagebox.showwarning(
@@ -3791,9 +4191,59 @@ Rules:
         )
 
     def save_study_text(self):
-        """Save study text to file"""
-        filename = self.current_study_file
+        """Save study text to file, or append after the box has been cleared."""
+        content = self.study_textbox.get(1.0, tk.END)
 
+        if not content.strip():
+            messagebox.showwarning("No Content", "Study text box is empty. Nothing to save.")
+            return False
+
+        if getattr(self, 'study_text_cleared', False):
+            previous_file = getattr(self, 'study_text_append_target', None) or getattr(self, 'current_study_file', None)
+            if previous_file:
+                choice = messagebox.askyesnocancel(
+                    "Save or Append",
+                    f"Append to the previous file?\n{previous_file}\n\n"
+                    "Yes = Append to previous file\n"
+                    "No = Choose another file\n"
+                    "Cancel = Abort"
+                )
+                if choice is None:
+                    return False
+                if choice:
+                    filename = previous_file
+                else:
+                    filename = filedialog.asksaveasfilename(
+                        defaultextension=".txt",
+                        filetypes=[("Text files", "*.txt")],
+                        initialfile=""
+                    )
+                    if not filename:
+                        return False
+            else:
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt")],
+                    initialfile=""
+                )
+                if not filename:
+                    return False
+
+            filename = self.ensure_text_filename(filename, '_TXT')
+            try:
+                self.append_content_to_file(filename, content)
+                self.current_study_file = filename
+                self.study_text_append_target = filename
+                self.study_text_cleared = False
+                self.set_baseline('Study Text Box')
+                self.update_study_save_button_state()
+                messagebox.showinfo("Success", f"Content appended to:\n{filename}")
+                return True
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to append study text: {str(e)}")
+                return False
+
+        filename = self.current_study_file
         if not filename:
             filename = filedialog.asksaveasfilename(
                 defaultextension=".txt",
@@ -3801,11 +4251,6 @@ Rules:
             )
             if not filename:
                 return False
-
-            nwext = os.path.splitext(filename)[0]
-            if '_TXT' not in filename:
-                filename = nwext + '_TXT.txt'
-            self.current_study_file = filename
         else:
             choice = messagebox.askyesnocancel(
                 "Save Options",
@@ -3821,16 +4266,17 @@ Rules:
                 )
                 if not filename:
                     return False
-                nwext = os.path.splitext(filename)[0]
-                if '_TXT' not in filename:
-                    filename = nwext + '_TXT.txt'
-                self.current_study_file = filename
 
+        filename = self.ensure_text_filename(filename, '_TXT')
         with open(filename, 'w', encoding='utf-8-sig') as file:
-            file.write(self.study_textbox.get(1.0, tk.END))
+            file.write(content)
 
-        messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
+        self.current_study_file = filename
+        self.study_text_append_target = filename
+        self.study_text_cleared = False
         self.set_baseline('Study Text Box')
+        self.update_study_save_button_state()
+        messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
         return True
 
     def clear_study_text(self):
@@ -3849,11 +4295,13 @@ Rules:
         if filename.endswith("_TRA.txt") or "_TRA.txt" in filename:
             self.current_translation_file = filename  # Save the loaded filename
             self.translation_content_cleared = False  # Reset flag when file is loaded
+            self.translation_append_target = None
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
             self.translation_textbox.delete(1.0, tk.END)
             self.translation_textbox.insert(tk.END, content)
             self.set_baseline('Translation Box')
+            self.update_translation_save_button_state()
             return
 
         messagebox.showwarning(
@@ -3863,80 +4311,82 @@ Rules:
         )
 
     def save_translation(self):
-        """Save translation to file.
-        
-        Behavior:
-        - If a translation file is loaded and content is NOT cleared, save to that file without prompting
-        - If content is cleared/deleted and new content is added, prompt for a new filename
-        - Otherwise, prompt for a filename
-        """
-        content = self.translation_textbox.get(1.0, tk.END).strip()
-        
-        # If no content, don't save
-        if not content:
+        """Save translation to file, or append after the box has been cleared."""
+        content = self.translation_textbox.get(1.0, tk.END)
+
+        if not content.strip():
             messagebox.showwarning("No Content", "Translation box is empty. Nothing to save.")
-            return
-        
-        # Check if we have a known file AND the content hasn't been cleared
-        if hasattr(self, 'current_translation_file') and self.current_translation_file:
-            # Check if content was cleared by looking at the flag
-            if getattr(self, 'translation_content_cleared', False):
-                # Content was cleared, so prompt for a new filename
+            return False
+
+        if getattr(self, 'translation_content_cleared', False):
+            previous_file = getattr(self, 'translation_append_target', None) or getattr(self, 'current_translation_file', None)
+            if previous_file:
+                choice = messagebox.askyesnocancel(
+                    "Save or Append",
+                    f"Append to the previous file?\n{previous_file}\n\n"
+                    "Yes = Append to previous file\n"
+                    "No = Choose another file\n"
+                    "Cancel = Abort"
+                )
+                if choice is None:
+                    return False
+                if choice:
+                    filename = previous_file
+                else:
+                    filename = filedialog.asksaveasfilename(
+                        defaultextension=".txt",
+                        filetypes=[("Text files", "*.txt")],
+                        initialfile=""
+                    )
+                    if not filename:
+                        return False
+            else:
                 filename = filedialog.asksaveasfilename(
                     defaultextension=".txt",
                     filetypes=[("Text files", "*.txt")],
                     initialfile=""
                 )
-                if filename:
-                    nwext = os.path.splitext(filename)[0]
-                    if '_TRA' not in filename:
-                        filename = nwext + '_TRA.txt'
-                    self.current_translation_file = filename
-                    self.translation_content_cleared = False  # Reset flag
-                    try:
-                        with open(filename, 'w', encoding='utf-8-sig') as file:
-                            file.write(content)
-                        messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
-                        self.set_baseline('Translation Box')
-                        return True
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
-                        return False
-                return False
-            else:
-                # Content not cleared, save to the known file
-                try:
-                    with open(self.current_translation_file, 'w', encoding='utf-8-sig') as file:
-                        file.write(content)
-                    messagebox.showinfo("Success", f"Translation saved to:\n{self.current_translation_file}")
-                    self.set_baseline('Translation Box')
-                    return True
-                except Exception as e:
-                    messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+                if not filename:
                     return False
 
-        # No known file, prompt for filename
-        filename = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Text files", "*.txt")],
-            initialfile=""
-        )
-        if filename:
-            nwext = os.path.splitext(filename)[0]
-            if '_TRA' not in filename:
-                filename = nwext + '_TRA.txt'
-            self.current_translation_file = filename
-            self.translation_content_cleared = False  # Reset flag
+            filename = self.ensure_text_filename(filename, '_TRA')
             try:
-                with open(filename, 'w', encoding='utf-8-sig') as file:
-                    file.write(content)
-                messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+                self.append_content_to_file(filename, content)
+                self.current_translation_file = filename
+                self.translation_append_target = filename
+                self.translation_content_cleared = False
                 self.set_baseline('Translation Box')
+                self.update_translation_save_button_state()
+                messagebox.showinfo("Success", f"Content appended to:\n{filename}")
                 return True
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+                messagebox.showerror("Error", f"Failed to append translation: {str(e)}")
                 return False
-        return False
+
+        filename = self.current_translation_file
+        if not filename:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt")],
+                initialfile=""
+            )
+            if not filename:
+                return False
+
+        filename = self.ensure_text_filename(filename, '_TRA')
+        try:
+            with open(filename, 'w', encoding='utf-8-sig') as file:
+                file.write(content)
+            self.current_translation_file = filename
+            self.translation_append_target = filename
+            self.translation_content_cleared = False
+            self.set_baseline('Translation Box')
+            self.update_translation_save_button_state()
+            messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
+            return True
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save translation: {str(e)}")
+            return False
 
     def initialize_change_tracking(self):
         """Initialize dirty tracking for the top-left text boxes."""
@@ -3959,6 +4409,19 @@ Rules:
     def on_text_modified(self, event, box_name):
         textbox = event.widget
         if textbox.edit_modified():
+            content = textbox.get(1.0, tk.END)
+            if box_name == 'Study Text Box':
+                if not content.strip():
+                    self.study_text_cleared = True
+                    if not self.study_text_append_target:
+                        self.study_text_append_target = self.current_study_file
+                    self.update_study_save_button_state()
+            elif box_name == 'Translation Box':
+                if not content.strip():
+                    self.translation_content_cleared = True
+                    if not self.translation_append_target:
+                        self.translation_append_target = self.current_translation_file
+                    self.update_translation_save_button_state()
             self.dirty_boxes[box_name] = True
             textbox.edit_modified(False)
 
@@ -4045,12 +4508,13 @@ Rules:
         if not filename:
             return False
 
-        nwext = os.path.splitext(filename)[0]
-        if '_TXT' not in filename:
-            filename = nwext + '_TXT.txt'
+        filename = self.ensure_text_filename(filename, '_TXT')
         self.current_study_file = filename
+        self.study_text_append_target = filename
+        self.study_text_cleared = False
         with open(filename, 'w', encoding='utf-8-sig') as file:
             file.write(self.study_textbox.get(1.0, tk.END))
+        self.update_study_save_button_state()
         messagebox.showinfo("Success", f"File saved successfully at:\n{filename}")
         self.set_baseline('Study Text Box')
         return True
@@ -4063,14 +4527,14 @@ Rules:
         if not filename:
             return False
 
-        nwext = os.path.splitext(filename)[0]
-        if '_TRA' not in filename:
-            filename = nwext + '_TRA.txt'
+        filename = self.ensure_text_filename(filename, '_TRA')
         self.current_translation_file = filename
+        self.translation_append_target = filename
+        self.translation_content_cleared = False
         with open(filename, 'w', encoding='utf-8-sig') as file:
             file.write(self.translation_textbox.get(1.0, tk.END))
+        self.update_translation_save_button_state()
         messagebox.showinfo("Success", f"Translation saved to:\n{filename}")
-        self.translation_content_cleared = False
         self.set_baseline('Translation Box')
         return True
 
@@ -4280,10 +4744,12 @@ Rules:
 
     def clear_study_text(self):
         """Clear study text"""
+        self.study_text_append_target = self.current_study_file
+        self.study_text_cleared = True
         self.current_study_file = None
         self.study_textbox.delete(1.0, tk.END)
-        self.current_study_file = None
         self.set_baseline('Study Text Box')
+        self.update_study_save_button_state()
 
     def confirm_clear_study_text(self):
         if not self.study_textbox.get(1.0, tk.END).strip():
@@ -4307,10 +4773,12 @@ Rules:
 
     def clear_translation(self):
         """Clear translation"""
+        self.translation_append_target = self.current_translation_file
         self.translation_content_cleared = True  # Set flag to indicate content was cleared
         self.translation_textbox.delete(1.0, tk.END)
         self.current_translation_file = None
         self.set_baseline('Translation Box')
+        self.update_translation_save_button_state()
 
     def confirm_clear_translation(self):
         if not self.translation_textbox.get(1.0, tk.END).strip():
@@ -4348,7 +4816,7 @@ Rules:
                     unless the English is more formal or uses scientific jargon:\n\n"""
                 f"English: \"{original_text}\"\n\nGerman:"
             )
-            translated = self.ask_chatgpt(prompt, model_name="gpt-4o", temperature=0.3)
+            translated = self.ask_chatgpt(prompt, model_name="gpt-5.5")
 
             self.translation_textbox.delete(1.0, tk.END)
             self.translation_textbox.insert(tk.END, translated)
