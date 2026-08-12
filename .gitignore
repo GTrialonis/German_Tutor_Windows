@@ -32,3 +32,6 @@ remarks-for-listening-compr.txt
 
 # initial requirements
 requirements-old.txt
+
+# words filter file
+Voc-Filter_VOC.txt

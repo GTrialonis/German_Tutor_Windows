@@ -2376,10 +2376,60 @@ Rules:
                 {"role": "user", "content": f"{prompt}\n\n{content}"}
             ],
             temperature=0.3)
-            auto_vocabulary = response.choices[0].message.content
+            auto_vocabulary = response.choices[0].message.content or ''
+            auto_vocabulary = auto_vocabulary.strip()
 
+            # Insert generated vocabulary into the Vocabulary (Current) textbox
             self.vocabulary_textbox.delete(1.0, tk.END)
             self.vocabulary_textbox.insert(tk.END, auto_vocabulary)
+
+            # --- Update Voc-Filter_VOC.txt by appending only new entries ---
+            try:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                filter_path = os.path.join(base_dir, 'Voc-Filter_VOC.txt')
+
+                existing = set()
+                if os.path.exists(filter_path):
+                    with open(filter_path, 'r', encoding='utf-8-sig') as f:
+                        for ln in f:
+                            s = ln.strip()
+                            if s:
+                                existing.add(s)
+
+                new_entries = []
+                for ln in auto_vocabulary.splitlines():
+                    s = ln.strip()
+                    if not s:
+                        continue
+                    if s not in existing:
+                        new_entries.append(s)
+                        existing.add(s)
+
+                if new_entries:
+                    # Append new entries to filter file
+                    with open(filter_path, 'a', encoding='utf-8-sig') as f:
+                        for item in new_entries:
+                            f.write(item + '\n')
+
+                    # Show popup listing appended words
+                    popup = tk.Toplevel(self.root)
+                    popup.title("New words added to Filter file")
+                    popup.configure(bg="#222")
+                    popup.geometry("600x380")
+                    popup.transient(self.root)
+                    popup.grab_set()
+
+                    tk.Label(popup, text=f"Appended {len(new_entries)} new word(s) to Voc-Filter_VOC.txt:", bg="#222", fg="white").pack(pady=8)
+                    st = scrolledtext.ScrolledText(popup, width=80, height=18)
+                    st.pack(padx=8, pady=8, fill='both', expand=True)
+                    st.insert(tk.END, '\n'.join(new_entries))
+                    st.configure(state='disabled')
+
+            except Exception as e:
+                try:
+                    messagebox.showerror("Filter Update Error", f"Failed to update Voc-Filter_VOC.txt: {e}")
+                except Exception:
+                    pass
 
         except FileNotFoundError:
             self.vocabulary_textbox.delete(1.0, tk.END)
