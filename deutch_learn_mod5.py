@@ -3424,7 +3424,7 @@ Rules:
         )
         
         try:
-            sentences = self.ask_chatgpt(prompt, model_name="gpt-4o", temperature=0.8)
+            sentences = self.ask_chatgpt(prompt, model_name="gpt-5.5")
             self.study_textbox.delete(1.0, tk.END)
             self.study_textbox.insert(tk.END, sentences)
         except Exception as e:
@@ -3536,7 +3536,7 @@ Rules:
         full_prompt = f"{prompt}\n\n{entry}"
 
         try:
-            examples = self.ask_chatgpt(full_prompt, model_name="gpt-4o", temperature=0.8)
+            examples = self.ask_chatgpt(full_prompt, model_name="gpt-5.5")
             # Insert examples without a leading blank line
             self.example_sentences_textbox.insert(tk.END, examples)
 
