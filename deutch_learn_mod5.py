@@ -1926,7 +1926,7 @@ class VocabularyApp:
         tk.Label(answer_frame, text="Score:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
         self.score_label = tk.Label(answer_frame, text="0%", fg="white", bg="#222")
         self.score_label.pack(side=tk.LEFT)
-        tk.Label(answer_frame, text="Test Question Number", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
+        tk.Label(answer_frame, text="Test Question #:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
         self.count_test_num_label = tk.Label(answer_frame, text="0", fg="white", bg="#222")
         self.count_test_num_label.pack(side=tk.LEFT)
 
