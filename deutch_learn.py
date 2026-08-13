@@ -1884,6 +1884,7 @@ class VocabularyApp:
         ttk.Button(answer_frame, text="Next Word", style='SmallBlue.TButton', command=self.next_word).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(answer_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_input).pack(side=tk.LEFT, padx=5)
         ttk.Button(answer_frame, text="Revise Mistakes", style='SmallGreenish.TButton', command=self.load_revision_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(answer_frame, text="Load Filter Vocabulary", style='SmallLimeGreen.TButton', command=self.load_filter_vocabulary).pack(side=tk.LEFT, padx=5)
         tk.Label(answer_frame, text="Score:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
         self.score_label = tk.Label(answer_frame, text="0%", fg="white", bg="#222")
         self.score_label.pack(side=tk.LEFT)
@@ -1902,6 +1903,7 @@ class VocabularyApp:
         ttk.Button(dict_btn_frame, text="AI word translation", style='SmallDarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Langenscheidt", style='SmallGrayBlue.TButton', command=self.fetch_langenscheidt).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Search vocabulary (Current).", style='SmallDarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="Search Filter", style='SmallLimeGreen.TButton', command=self.search_filter).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
@@ -2738,6 +2740,38 @@ Rules:
             with open(file_path, 'a', encoding='utf-8-sig') as f:
                 f.write(missed_line + "\n")
 
+    def load_filter_vocabulary(self):
+        """Load filter vocabulary from Voc-Filter_VOC.txt into the Vocabulary textbox"""
+        filter_file_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
+        
+        try:
+            with open(filter_file_path, 'r', encoding='utf-8-sig') as file:
+                content = file.read()
+        except FileNotFoundError:
+            messagebox.showerror("File Not Found", f"Could not open file:\n{filter_file_path}")
+            return
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read filter vocabulary file:\n{e}")
+            return
+        
+        # Clear and load the vocabulary textbox
+        self.vocabulary_textbox.delete(1.0, tk.END)
+        self.vocabulary_textbox.insert(tk.END, content)
+        self.vocabulary = [line.strip() for line in content.splitlines() if line.strip()]
+        self.current_voc_file = filter_file_path
+        
+        # Update the vocabulary label
+        try:
+            self.update_vocabulary_label_path()
+        except Exception:
+            pass
+        
+        # Load test file if available
+        self.load_current_voc += 1
+        self.load_test_file()
+        
+        messagebox.showinfo("Success", "Filter vocabulary loaded successfully!")
+    
     def load_revision_file(self):
         """Load revision file for mistake review"""
         # Always load the German revision file when Revise Mistakes is clicked
@@ -3354,6 +3388,61 @@ Rules:
             self.ai_translate_word()
             
         
+        # Auto-scroll to the bottom
+        self.ai_responses_textbox.see(tk.END)
+
+    def search_filter(self, event=None):
+        """Search in the filter vocabulary file"""
+        # Get the word to search from the input field
+        search_word = self.dictionary_entry.get().strip().lower()
+        
+        if not search_word:
+            messagebox.showwarning("Warning", "Please enter a word to search")
+            return
+        
+        # Path to the filter vocabulary file
+        filter_file_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
+        
+        try:
+            # Read the filter vocabulary file
+            with open(filter_file_path, 'r', encoding='utf-8') as f:
+                filter_content = f.read()
+        except FileNotFoundError:
+            messagebox.showerror("Error", f"Filter file not found: {filter_file_path}")
+            return
+        except Exception as e:
+            messagebox.showerror("Error", f"Error reading filter file: {str(e)}")
+            return
+        
+        # Initialize result
+        result = ""
+        
+        # Search through each line of the filter vocabulary
+        for line in filter_content.split('\n'):
+            if '=' in line:  # Only process lines with translations
+                left_side = line.split('=')[0].strip()
+                right_side = line.split('=')[1].strip()
+                
+                # Check if search word is German (left side)
+                german_words = left_side.split(',')[0].strip().lower()
+                if search_word == german_words.lower():
+                    # Found German word, return English meanings
+                    result = f"[FILTER] Found: {left_side}\nMeanings: {right_side}\n\n"
+                    break
+                    
+                # Check if search word is English (right side)
+                english_words = [w.strip().lower() for w in right_side.split(',')]
+                if search_word in english_words:
+                    # Found English word, return German equivalent
+                    result = f"[FILTER] Found: {right_side}\nGerman: {left_side}\n\n"
+                    break
+        
+        # Display results in AI responses textbox
+        if result:
+            self.ai_responses_textbox.insert(tk.END, result)
+        else:
+            self.ai_responses_textbox.insert(tk.END, f"[FILTER] Word not found: {search_word}\n\n")
+            
         # Auto-scroll to the bottom
         self.ai_responses_textbox.see(tk.END)
 
