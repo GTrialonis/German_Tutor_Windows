@@ -610,9 +610,9 @@ class VocabularyApp:
             """
             
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
+                # temperature=0.7,
             )
             
             questions_text = response.choices[0].message.content.strip()
@@ -724,9 +724,8 @@ class VocabularyApp:
             """
             
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
             )
             
             evaluation = response.choices[0].message.content.strip()
@@ -888,9 +887,8 @@ class VocabularyApp:
             """
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
             )
 
             evaluation = response.choices[0].message.content.strip()
@@ -1540,9 +1538,8 @@ class VocabularyApp:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
             )
             return response.choices[0].message.content.strip()
         except:
@@ -1922,7 +1919,7 @@ class VocabularyApp:
         ttk.Button(answer_frame, text="Next Word", style='SmallBlue.TButton', command=self.next_word).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(answer_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_input).pack(side=tk.LEFT, padx=5)
         ttk.Button(answer_frame, text="Revise Mistakes", style='SmallGreenish.TButton', command=self.load_revision_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(answer_frame, text="Load Filter Vocabulary", style='SmallLimeGreen.TButton', command=self.load_filter_vocabulary).pack(side=tk.LEFT, padx=5)
+        ttk.Button(answer_frame, text="Load Filter Voc.", style='SmallLimeGreen.TButton', command=self.load_filter_vocabulary).pack(side=tk.LEFT, padx=5)
         tk.Label(answer_frame, text="Score:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
         self.score_label = tk.Label(answer_frame, text="0%", fg="white", bg="#222")
         self.score_label.pack(side=tk.LEFT)
@@ -1938,11 +1935,12 @@ class VocabularyApp:
 
         dict_btn_frame = tk.Frame(right_frame, bg="#222")
         dict_btn_frame.pack(fill=tk.X)
-        ttk.Button(dict_btn_frame, text="AI word translation", style='SmallDarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="AI translation", style='SmallDarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Langenscheidt", style='SmallGrayBlue.TButton', command=self.fetch_langenscheidt).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(dict_btn_frame, text="Search vocabulary (Current).", style='SmallDarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(dict_btn_frame, text="Search Voc. (Current).", style='SmallDarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Search Filter", style='SmallLimeGreen.TButton', command=self.search_filter).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
+        ttk.Button(dict_btn_frame, text="Append Voc. to Filter", style='SmallGreen.TButton', command=self.append_current_vocabulary_to_filter).pack(side=tk.LEFT, padx=5)
 
         # AI Responses to prompts
         self.ai_responses_textbox = self.create_labeled_textbox(right_frame, "AI Responses from prompt on the left side", True, height=11, label_font="Helvetica")
@@ -2459,11 +2457,10 @@ class VocabularyApp:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.6,
                 max_tokens=450,
-            )
+)
             english_text = response.choices[0].message.content.strip()
         except Exception as e:
             # If the API call fails, provide a safe fallback text
@@ -2616,7 +2613,7 @@ class VocabularyApp:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=[
                     {"role": "system", "content": "You are a German grammar expert. Provide concise, accurate noun information."},
                     {"role": "user", "content": prompt}
@@ -2756,12 +2753,11 @@ Rules:
             Example: oft = often, frequently
 6) All output should be in plain text."""
 
-            response = client.chat.completions.create(model="gpt-4o",
+            response = client.chat.completions.create(model="gpt-5.5"),
             messages=[
                 {"role": "system", "content": "You are a helpful assistant for language study."},
                 {"role": "user", "content": f"{prompt}\n\n{content}"}
             ],
-            temperature=0.3)
             auto_vocabulary = response.choices[0].message.content
 
             self.vocabulary_textbox.delete(1.0, tk.END)
@@ -3026,6 +3022,76 @@ Rules:
         """Clear answer input"""
         self.answer_entry.delete(0, tk.END)
 
+    def append_current_vocabulary_to_filter(self):
+        """Append only words from the current vocabulary that are not in the filter file.
+
+        The displayed Vocabulary (Current) textbox is left untouched. We only compare its
+        contents against Voc-Filter_VOC.txt and append missing entries to that filter.
+        """
+        try:
+            vocab_text = self.vocabulary_textbox.get(1.0, tk.END)
+        except Exception as e:
+            messagebox.showerror("Vocabulary Error", f"Could not read Vocabulary (Current): {e}", parent=self.root)
+            return
+
+        current_entries = []
+        for line in vocab_text.splitlines():
+            item = line.strip()
+            if item:
+                current_entries.append(item)
+
+        if not current_entries:
+            messagebox.showinfo("No vocabulary", "The Vocabulary (Current) textbox is empty.", parent=self.root)
+            return
+
+        filter_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
+
+        try:
+            existing = set()
+            if os.path.exists(filter_path):
+                with open(filter_path, 'r', encoding='utf-8-sig') as f:
+                    for line in f:
+                        item = line.strip()
+                        if item:
+                            existing.add(item)
+
+            new_entries = []
+            for item in current_entries:
+                if item not in existing:
+                    new_entries.append(item)
+                    existing.add(item)
+
+            if not new_entries:
+                messagebox.showinfo("No new entries", "All entries already exist in the filter file.", parent=self.root)
+                return
+
+            with open(filter_path, 'a', encoding='utf-8-sig', newline='') as f:
+                for item in new_entries:
+                    f.write(item + '\n')
+
+            popup = tk.Toplevel(self.root)
+            popup.title("Appended to Filter")
+            popup.configure(bg="#222")
+            popup.geometry("420x280")
+            popup.transient(self.root)
+            popup.grab_set()
+
+            screen_w = self.root.winfo_screenwidth()
+            screen_h = self.root.winfo_screenheight()
+            popup.update_idletasks()
+            x = max(10, screen_w - popup.winfo_width() - 30)
+            y = max(40, min(120, screen_h // 12))
+            popup.geometry(f"420x280+{x}+{y}")
+
+            tk.Label(popup, text=f"Added {len(new_entries)} new item(s) to filter:", bg="#222", fg="white", font=("Helvetica", 9, "bold")).pack(pady=(10, 4))
+            text_widget = scrolledtext.ScrolledText(popup, width=52, height=15, bg="#333", fg="white", wrap=tk.WORD)
+            text_widget.pack(padx=10, pady=(0, 10), fill=tk.BOTH, expand=True)
+            text_widget.insert(tk.END, '\n'.join(new_entries))
+            text_widget.configure(state='disabled')
+
+        except Exception as e:
+            messagebox.showerror("Filter Error", f"Failed to update filter file: {e}", parent=self.root)
+
     def check_answer(self, event=None):
         """Check user's answer"""
         user_input_raw = self.answer_entry.get().strip()
@@ -3262,9 +3328,8 @@ Rules:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.5",
                 messages=self.conversation_history,
-                temperature=0.7,
             )
             
             questions = response.choices[0].message.content.strip()
@@ -4748,7 +4813,7 @@ Rules:
                 + numbered
             )
 
-            detect_resp = self.ask_chatgpt(detect_prompt, model_name="gpt-4o", temperature=0.0)
+            detect_resp = self.ask_chatgpt(detect_prompt, model_name="gpt-5.5")
 
             import re
             verb_indices = []
@@ -4779,7 +4844,7 @@ Rules:
                 + verbs_input
             )
 
-            correction_resp = self.ask_chatgpt(correction_prompt, model_name="gpt-4o", temperature=0.0)
+            correction_resp = self.ask_chatgpt(correction_prompt, model_name="gpt-5.5")
             corrected_verbs = [ln.strip() for ln in correction_resp.splitlines() if ln.strip()]
 
             # Ensure we have at least as many corrected lines as inputs; otherwise try to salvage by taking first N non-empty
