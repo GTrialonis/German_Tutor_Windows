@@ -2613,12 +2613,12 @@ class VocabularyApp:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are a German grammar expert. Provide concise, accurate noun information."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=250,
+                max_completion_tokens=250,
                 temperature=0.3
             )
             
