@@ -2317,6 +2317,7 @@ class VocabularyApp:
         # Configure highlight tags
         textbox.tag_configure("highlight", background="yellow", foreground="black")
         textbox.tag_configure("search_highlight", background="#ffec8b", foreground="black")
+        textbox.tag_configure("malformed_context", background="yellow", foreground="black")
         
         # Add buttons if requested
         if add_buttons:
@@ -2753,11 +2754,13 @@ Rules:
             Example: oft = often, frequently
 6) All output should be in plain text."""
 
-            response = client.chat.completions.create(model="gpt-5.5"),
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant for language study."},
-                {"role": "user", "content": f"{prompt}\n\n{content}"}
-            ],
+            response = self.client.chat.completions.create(
+                model="gpt-5.5",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for language study."},
+                    {"role": "user", "content": f"{prompt}\n\n{content}"}
+                ]
+            )
             auto_vocabulary = response.choices[0].message.content
 
             self.vocabulary_textbox.delete(1.0, tk.END)
@@ -2990,6 +2993,7 @@ Rules:
             german_part = parts[0].strip()
             english_part = parts[1].strip()
         except IndexError:
+            self.highlight_malformed_vocabulary_line()
             self.test_textbox.insert(tk.END, "⚠️ Malformed vocabulary line.\n")
             return
 
@@ -3022,6 +3026,27 @@ Rules:
         """Clear answer input"""
         self.answer_entry.delete(0, tk.END)
 
+    def highlight_malformed_vocabulary_line(self):
+        """Highlight the line above the malformed vocabulary entry."""
+        try:
+            textbox = self.vocabulary_textbox
+            textbox.tag_remove("malformed_context", "1.0", tk.END)
+            for line_number in range(1, int(textbox.index(tk.END).split('.')[0])):
+                line = textbox.get(f"{line_number}.0", f"{line_number}.end").strip()
+                if line != self.current_word.strip():
+                    continue
+
+                highlight_line = max(1, line_number - 1)
+                textbox.tag_add(
+                    "malformed_context",
+                    f"{highlight_line}.0",
+                    f"{highlight_line + 1}.0"
+                )
+                textbox.see(f"{highlight_line}.0")
+                return
+        except (AttributeError, tk.TclError):
+            pass
+
     def append_current_vocabulary_to_filter(self):
         """Append only words from the current vocabulary that are not in the filter file.
 
@@ -3035,10 +3060,14 @@ Rules:
             return
 
         current_entries = []
+        current_german_entries = set()
         for line in vocab_text.splitlines():
             item = line.strip()
             if item:
-                current_entries.append(item)
+                german_entry = item.split('=', 1)[0].strip().casefold()
+                if german_entry and german_entry not in current_german_entries:
+                    current_entries.append(item)
+                    current_german_entries.add(german_entry)
 
         if not current_entries:
             messagebox.showinfo("No vocabulary", "The Vocabulary (Current) textbox is empty.", parent=self.root)
@@ -3047,25 +3076,36 @@ Rules:
         filter_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
 
         try:
-            existing = set()
+            existing_german_entries = set()
             if os.path.exists(filter_path):
                 with open(filter_path, 'r', encoding='utf-8-sig') as f:
                     for line in f:
                         item = line.strip()
                         if item:
-                            existing.add(item)
+                            german_entry = item.split('=', 1)[0].strip().casefold()
+                            if german_entry:
+                                existing_german_entries.add(german_entry)
 
             new_entries = []
             for item in current_entries:
-                if item not in existing:
+                german_entry = item.split('=', 1)[0].strip().casefold()
+                if german_entry not in existing_german_entries:
                     new_entries.append(item)
-                    existing.add(item)
+                    existing_german_entries.add(german_entry)
 
             if not new_entries:
                 messagebox.showinfo("No new entries", "All entries already exist in the filter file.", parent=self.root)
                 return
 
-            with open(filter_path, 'a', encoding='utf-8-sig', newline='') as f:
+            needs_separator = os.path.exists(filter_path) and os.path.getsize(filter_path) > 0
+            if needs_separator:
+                with open(filter_path, 'rb') as f:
+                    f.seek(-1, os.SEEK_END)
+                    needs_separator = f.read(1) not in (b'\n', b'\r')
+
+            with open(filter_path, 'a', encoding='utf-8', newline='') as f:
+                if needs_separator:
+                    f.write('\n')
                 for item in new_entries:
                     f.write(item + '\n')
 
