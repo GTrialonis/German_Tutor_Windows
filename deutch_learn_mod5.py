@@ -154,6 +154,7 @@ class VocabularyApp:
         self.load_recent_voc_files()
         self.study_text_cleared = False  # Track if study text content was cleared
         self.study_text_append_target = None
+        self.serial_translation_sentences = []
         self.translation_content_cleared = False  # Track if translation content was cleared
         self.translation_append_target = None
         self.current_example_sentences_file = None
@@ -1570,7 +1571,16 @@ class VocabularyApp:
             add_buttons=False,
             label_button=("Append", self.append_vocabulary_to_file)
         )
-        self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=8, label_font=self.left_section_font, textbox_font=self.textbox_font, add_buttons=True)
+        self.study_textbox = self.create_labeled_textbox(
+            left_frame,
+            "Study Text Box:",
+            True,
+            height=8,
+            label_font=self.left_section_font,
+            textbox_font=self.textbox_font,
+            add_buttons=True,
+            additional_label_button=("Translate English sentences serially", self.translate_last_english_sentence)
+        )
         tk.Label(left_frame, text="In the Study Text Box: double-click on a German noun to see it declined. Shift + Right click on mouse to find word in Vocabulary.", fg="cyan", bg="#222").pack(anchor='w')
         self.study_textbox.bind('<Double-Button-1>', self.on_study_text_double_click)
         self.study_textbox.bind('<Shift-Button-3>', self.on_study_text_shift_right_click)
@@ -2320,7 +2330,7 @@ class VocabularyApp:
         except Exception as e:
             messagebox.showerror("Open Error", f"Could not open in Notepad: {e}", parent=self.root)
 
-    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False, label_button=None):
+    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False, label_button=None, additional_label_button=None):
         """Create a labeled textbox with optional scrollbar and highlight buttons"""
         frame = tk.Frame(parent, bg="#222")
         frame.pack(fill=tk.X, padx=10, pady=(6, 0))
@@ -2348,6 +2358,21 @@ class VocabularyApp:
             label_action_button.pack(side=tk.LEFT, padx=(18, 0))
             if button_text == "Append":
                 Tooltip(label_action_button, "Append the contents of the vocabulary to a file.")
+
+        if additional_label_button:
+            button_text, button_command = additional_label_button
+            serial_button = tk.Button(
+                label_row,
+                text=button_text,
+                bg="#ADD8E6",
+                fg="black",
+                activebackground="#9AC9D8",
+                activeforeground="black",
+                font=("Arial", 9, "bold"),
+                command=button_command
+            )
+            serial_button.pack(side=tk.LEFT, padx=(8, 0))
+            Tooltip(serial_button, "Translate the newest English sentence into German and append it to the Translation Box.")
         
         active_textbox_font = textbox_font if textbox_font is not None else label_font
         if scrollbar:
@@ -4438,6 +4463,7 @@ Rules:
             self.current_study_file = filename
             self.study_text_cleared = False
             self.study_text_append_target = None
+            self.serial_translation_sentences = []
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 content = file.read()
 
@@ -5016,6 +5042,7 @@ Rules:
         """Clear study text"""
         self.study_text_append_target = self.current_study_file
         self.study_text_cleared = True
+        self.serial_translation_sentences = []
         self.current_study_file = None
         self.study_textbox.delete(1.0, tk.END)
         self.set_baseline('Study Text Box')
@@ -5045,6 +5072,7 @@ Rules:
         """Clear translation"""
         self.translation_append_target = self.current_translation_file
         self.translation_content_cleared = True  # Set flag to indicate content was cleared
+        self.serial_translation_sentences = []
         self.translation_textbox.delete(1.0, tk.END)
         self.current_translation_file = None
         self.set_baseline('Translation Box')
@@ -5093,6 +5121,48 @@ Rules:
 
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Translation Error", f"An error occurred: {e}")
+
+    def translate_last_english_sentence(self):
+        """Translate the next newly added English sentence into German."""
+        study_text = self.study_textbox.get("1.0", tk.END).strip()
+        if not study_text:
+            self.serial_translation_sentences = []
+            messagebox.showwarning("Input Empty", "Please enter an English sentence in the Study Text Box.")
+            return
+
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", study_text)
+            if sentence.strip()
+        ]
+        translated_prefix = self.serial_translation_sentences
+        if sentences[:len(translated_prefix)] != translated_prefix:
+            translated_prefix = []
+
+        if len(translated_prefix) >= len(sentences):
+            messagebox.showinfo("Already Translated", "There is no new sentence to translate.")
+            return
+
+        sentence = sentences[len(translated_prefix)]
+        prompt = (
+            "Translate the following English sentence into natural, everyday German. "
+            "Return only the German translation, without explanations or quotation marks:\n\n"
+            f"{sentence}"
+        )
+
+        try:
+            translated = self.ask_chatgpt(prompt, model_name="gpt-5.5").strip()
+            if not translated:
+                messagebox.showwarning("No Translation", "The translation service returned no text.")
+                return
+
+            existing_translation = self.translation_textbox.get("1.0", tk.END)
+            if existing_translation.strip() and not existing_translation.endswith("\n"):
+                self.translation_textbox.insert(tk.END, "\n")
+            self.translation_textbox.insert(tk.END, translated + "\n")
+            self.serial_translation_sentences = sentences[:len(translated_prefix) + 1]
+        except Exception as e:
+            messagebox.showerror("Translation Error", f"Could not translate the sentence: {e}")
 
     def copy_translation_text(self):
         """Show popup with copy options for Translation Box."""
