@@ -1560,7 +1560,16 @@ class VocabularyApp:
         left_frame.pack(side=tk.LEFT, fill=tk.Y)
         
         # Create textboxes
-        self.vocabulary_textbox = self.create_labeled_textbox(left_frame, "Vocabulary (Current):", True, height=7, label_font=self.left_section_font, textbox_font=self.textbox_font, add_buttons=False)
+        self.vocabulary_textbox = self.create_labeled_textbox(
+            left_frame,
+            "Vocabulary (Current):",
+            True,
+            height=7,
+            label_font=self.left_section_font,
+            textbox_font=self.textbox_font,
+            add_buttons=False,
+            label_button=("Append", self.append_vocabulary_to_file)
+        )
         self.study_textbox = self.create_labeled_textbox(left_frame, "Study Text Box:", True, height=8, label_font=self.left_section_font, textbox_font=self.textbox_font, add_buttons=True)
         tk.Label(left_frame, text="In the Study Text Box: double-click on a German noun to see it declined. Shift + Right click on mouse to find word in Vocabulary.", fg="cyan", bg="#222").pack(anchor='w')
         self.study_textbox.bind('<Double-Button-1>', self.on_study_text_double_click)
@@ -1758,7 +1767,7 @@ class VocabularyApp:
         
         # Set window size to 1/4 width, 3/4 height (taller for better button visibility)
         window_width = screen_width // 4
-        window_height = screen_height * 3 // 4
+        window_height = screen_height * 3 // 5
         
         # Position about halfway to the right from the middle of the screen
         x_position = screen_width * 3 // 4 - window_width // 2
@@ -1806,6 +1815,11 @@ class VocabularyApp:
         clear_btn = tk.Button(button_frame, text="Clear", bg="#E74C3C", fg="black",
                             font=("Arial", 10, "bold"), command=lambda: text_area.delete(1.0, tk.END))
         clear_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        # Load text file button
+        load_txt_btn = tk.Button(button_frame, text="Load txt file", bg="#64B5F6", fg="black",
+                       font=("Arial", 10, "bold"), command=lambda: self.load_notebook_file(text_area))
+        load_txt_btn.pack(side=tk.LEFT, padx=(0, 5))
         
         # Close button
         close_btn = tk.Button(button_frame, text="Close", bg=button_colors['close'], fg="black",
@@ -1814,6 +1828,22 @@ class VocabularyApp:
         
         # Focus on text area
         text_area.focus_set()
+
+    def load_notebook_file(self, text_area):
+        """Load text from a file into the notebook."""
+        try:
+            file_path = filedialog.askopenfilename(
+                title="Load Notebook Text File",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            )
+
+            if file_path:
+                with open(file_path, 'r', encoding='utf-8-sig') as f:
+                    content = f.read()
+                text_area.delete("1.0", tk.END)
+                text_area.insert("1.0", content)
+        except Exception as e:
+            messagebox.showerror("Load Error", f"Failed to load notebook file: {str(e)}")
 
     def save_notebook(self, text_area):
         """Save notebook content to a default file"""
@@ -2290,19 +2320,34 @@ class VocabularyApp:
         except Exception as e:
             messagebox.showerror("Open Error", f"Could not open in Notepad: {e}", parent=self.root)
 
-    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False):
+    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False, label_button=None):
         """Create a labeled textbox with optional scrollbar and highlight buttons"""
         frame = tk.Frame(parent, bg="#222")
         frame.pack(fill=tk.X, padx=10, pady=(6, 0))
         
-        label = tk.Label(frame, text=label_text, bg="#222", fg="gold", font=label_font)
+        label_row = tk.Frame(frame, bg="#222")
+        label_row.pack(fill=tk.X)
+
+        label = tk.Label(label_row, text=label_text, bg="#222", fg="gold", font=label_font)
         # Keep a reference to the vocabulary label so we can update it with the file path
         try:
             if isinstance(label_text, str) and label_text.strip().startswith("Vocabulary (Current)"):
                 self.vocabulary_label = label
         except Exception:
             pass
-        label.pack(anchor="w")
+        label.pack(side=tk.LEFT, anchor="w")
+
+        if label_button:
+            button_text, button_command = label_button
+            label_action_button = ttk.Button(
+                label_row,
+                text=button_text,
+                style="SmallGreen.TButton",
+                command=button_command
+            )
+            label_action_button.pack(side=tk.LEFT, padx=(18, 0))
+            if button_text == "Append":
+                Tooltip(label_action_button, "Append the contents of the vocabulary to a file.")
         
         active_textbox_font = textbox_font if textbox_font is not None else label_font
         if scrollbar:
@@ -3131,6 +3176,37 @@ Rules:
 
         except Exception as e:
             messagebox.showerror("Filter Error", f"Failed to update filter file: {e}", parent=self.root)
+
+    def append_vocabulary_to_file(self):
+        """Append the current vocabulary textbox contents to a user-selected file."""
+        content = self.vocabulary_textbox.get(1.0, tk.END).strip()
+        if not content:
+            messagebox.showwarning(
+                "No Vocabulary",
+                "The Vocabulary (Current) textbox is empty.",
+                parent=self.root
+            )
+            return
+
+        filename = filedialog.askopenfilename(
+            title="Select file to append vocabulary to",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            parent=self.root
+        )
+        if not filename:
+            return
+
+        try:
+            with open(filename, "a", encoding="utf-8-sig", newline="") as file:
+                if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                    with open(filename, "rb") as existing_file:
+                        existing_file.seek(-1, os.SEEK_END)
+                        if existing_file.read(1) not in (b"\n", b"\r"):
+                            file.write("\n")
+                file.write(content + "\n")
+            messagebox.showinfo("Append Complete", f"Vocabulary appended to:\n{filename}", parent=self.root)
+        except Exception as e:
+            messagebox.showerror("Append Error", f"Could not append vocabulary:\n{e}", parent=self.root)
 
     def check_answer(self, event=None):
         """Check user's answer"""
