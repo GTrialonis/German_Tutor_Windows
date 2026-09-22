@@ -205,6 +205,11 @@ class VocabularyApp:
         self.reading_paused = False
         self.reading_thread = None
         self.speech_playing = False
+        self.dictation_sentences = []
+        self.dictation_index = 0
+        self.dictation_active = False
+        self.dictation_playback_id = 0
+        self.dictation_controls_window = None
 
         # Font and style configuration
         self.small_button_font = tkFont.Font(family="Helvetica", size=8, weight="normal")
@@ -265,6 +270,18 @@ class VocabularyApp:
                                background=colors['background'],
                                foreground=colors['foreground'],
                                font=self.small_button_font)
+
+        self.style.configure(
+            'SerialTranslation.TButton',
+            background='#ADD8E6',
+            foreground='black',
+            font=('Arial', 9, 'bold')
+        )
+        self.style.map(
+            'SerialTranslation.TButton',
+            background=[('active', 'white'), ('pressed', 'white')],
+            foreground=[('active', 'black'), ('pressed', 'black')]
+        )
 
     def load_recent_voc_files(self):
         """Load recent vocabulary files from disk"""
@@ -1379,7 +1396,7 @@ class VocabularyApp:
               style='SmallRed.TButton',
               command=listen_window.destroy).pack(pady=5, fill=tk.X)
 
-    def speak_text(self, text, voice="alloy"):
+    def speak_text(self, text, voice="alloy", should_continue=None):
         """Speak text using TTS"""
         try:
             # If text is short, use direct generation. For long text, split into chunks.
@@ -1463,12 +1480,16 @@ class VocabularyApp:
                 try:
                     files = generate_audio_files_for_text(text, voice)
                     for f in files:
+                        if should_continue is not None and not should_continue():
+                            break
                         if pygame.mixer.music.get_busy():
                             pygame.mixer.music.stop()
                         pygame.mixer.music.load(f)
                         pygame.mixer.music.play()
-                        while pygame.mixer.music.get_busy():
+                        while pygame.mixer.music.get_busy() and (should_continue is None or should_continue()):
                             time.sleep(0.1)
+                        if should_continue is not None and not should_continue():
+                            pygame.mixer.music.stop()
                     # cleanup
                     for f in files:
                         try:
@@ -1485,6 +1506,212 @@ class VocabularyApp:
 
         except Exception as e:
             messagebox.showerror("TTS Error", f"Failed to generate speech: {str(e)}")
+
+    def show_dictation_source_popup(self):
+        """Choose the text source for a sentence-by-sentence dictation."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Dictation Source")
+        popup.configure(bg="#222")
+        popup.geometry("420x210")
+        popup.transient(self.root)
+        popup.grab_set()
+
+        tk.Label(
+            popup,
+            text="Choose the text for dictation:",
+            bg="#222",
+            fg="white",
+            font=("Arial", 11, "bold")
+        ).pack(pady=(18, 12))
+
+        def use_study_text():
+            text = self.study_textbox.get("1.0", tk.END).strip()
+            if not text:
+                messagebox.showwarning("No Text", "Study Text Box is empty.", parent=popup)
+                return
+            popup.destroy()
+            self.start_dictation(text)
+
+        def load_file():
+            filename = filedialog.askopenfilename(
+                parent=popup,
+                title="Select text for dictation",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            )
+            if not filename:
+                return
+            try:
+                with open(filename, "r", encoding="utf-8-sig") as file:
+                    text = file.read().strip()
+                if not text:
+                    messagebox.showwarning("No Text", "The selected file is empty.", parent=popup)
+                    return
+                self.study_textbox.delete("1.0", tk.END)
+                self.study_textbox.insert(tk.END, text)
+                popup.destroy()
+                self.start_dictation(text)
+            except Exception as error:
+                messagebox.showerror("Load Error", f"Could not load the selected file: {error}", parent=popup)
+
+        button_frame = tk.Frame(popup, bg="#222")
+        button_frame.pack(fill=tk.X, padx=25, pady=8)
+        ttk.Button(
+            button_frame,
+            text="Use Study Text Box",
+            style="SmallBlue.TButton",
+            command=use_study_text
+        ).pack(fill=tk.X, pady=4)
+        ttk.Button(
+            button_frame,
+            text="Select Text File",
+            style="SmallGreen.TButton",
+            command=load_file
+        ).pack(fill=tk.X, pady=4)
+        ttk.Button(
+            button_frame,
+            text="Cancel",
+            style="SmallRed.TButton",
+            command=popup.destroy
+        ).pack(fill=tk.X, pady=4)
+
+        popup.protocol("WM_DELETE_WINDOW", popup.destroy)
+
+    def start_dictation(self, text):
+        """Prepare sentence-by-sentence dictation controls."""
+        self.stop_dictation_playback()
+        self.dictation_sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", text)
+            if sentence.strip()
+        ]
+        if not self.dictation_sentences:
+            messagebox.showwarning("No Sentences", "No sentences were found for dictation.", parent=self.root)
+            return
+
+        self.dictation_index = 0
+        self.dictation_active = False
+        self.show_dictation_controls()
+
+    def show_dictation_controls(self):
+        """Display controls for starting and advancing the dictation."""
+        controls = tk.Toplevel(self.root)
+        self.dictation_controls_window = controls
+        controls.title("Dictation")
+        controls.configure(bg="#222")
+        controls.geometry("430x190")
+        controls.transient(self.root)
+        controls.grab_set()
+
+        status_label = tk.Label(
+            controls,
+            text=f"Ready: sentence 1 of {len(self.dictation_sentences)}",
+            bg="#222",
+            fg="white",
+            font=("Arial", 10)
+        )
+        status_label.pack(pady=(20, 14))
+
+        button_frame = tk.Frame(controls, bg="#222")
+        button_frame.pack(fill=tk.X, padx=18)
+
+        start_button = ttk.Button(
+            button_frame,
+            text="Start",
+            style="SmallGreen.TButton",
+            command=lambda: self.start_dictation_sentence(status_label, start_button, next_button)
+        )
+        start_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+
+        stop_button = ttk.Button(
+            button_frame,
+            text="Stop",
+            style="SmallRed.TButton",
+            command=lambda: self.stop_dictation(status_label, start_button, next_button)
+        )
+        stop_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+
+        cancel_button = ttk.Button(
+            button_frame,
+            text="Cancel",
+            style="SmallDarkRed.TButton",
+            command=self.cancel_dictation
+        )
+        cancel_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+
+        next_button = ttk.Button(
+            button_frame,
+            text="Next",
+            style="SmallBlue.TButton",
+            command=lambda: self.next_dictation_sentence(status_label, start_button, next_button)
+        )
+        next_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+
+        controls.protocol("WM_DELETE_WINDOW", self.cancel_dictation)
+
+    def start_dictation_sentence(self, status_label, start_button, next_button):
+        """Start dictating the current sentence."""
+        if self.dictation_active:
+            return
+        self.dictation_active = True
+        start_button.config(state=tk.DISABLED)
+        next_button.config(state=tk.NORMAL)
+        status_label.config(text=f"Dictating sentence {self.dictation_index + 1} of {len(self.dictation_sentences)}")
+        self.read_dictation_sentence()
+
+    def read_dictation_sentence(self):
+        """Read the current dictation sentence with cancellable playback."""
+        self.stop_dictation_playback()
+        self.dictation_playback_id += 1
+        playback_id = self.dictation_playback_id
+        sentence = self.dictation_sentences[self.dictation_index]
+        self.speak_text(
+            sentence,
+            "alloy",
+            should_continue=lambda: (
+                self.dictation_active and self.dictation_playback_id == playback_id
+            )
+        )
+
+    def stop_dictation(self, status_label, start_button, next_button):
+        """Stop playback while keeping the current sentence available."""
+        self.dictation_active = False
+        self.stop_dictation_playback()
+        start_button.config(state=tk.NORMAL)
+        next_button.config(state=tk.NORMAL)
+        status_label.config(text=f"Stopped at sentence {self.dictation_index + 1} of {len(self.dictation_sentences)}")
+
+    def next_dictation_sentence(self, status_label, start_button, next_button):
+        """Advance to and read the next sentence."""
+        if not self.dictation_active:
+            self.start_dictation_sentence(status_label, start_button, next_button)
+            return
+        if self.dictation_index >= len(self.dictation_sentences) - 1:
+            status_label.config(text="Dictation complete")
+            next_button.config(state=tk.DISABLED)
+            self.dictation_active = False
+            self.stop_dictation_playback()
+            return
+
+        self.dictation_index += 1
+        status_label.config(text=f"Dictating sentence {self.dictation_index + 1} of {len(self.dictation_sentences)}")
+        self.read_dictation_sentence()
+
+    def stop_dictation_playback(self):
+        """Stop current dictation audio and invalidate older playback threads."""
+        self.dictation_playback_id += 1
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+
+    def cancel_dictation(self):
+        """Cancel dictation and close its controls."""
+        self.dictation_active = False
+        self.stop_dictation_playback()
+        if self.dictation_controls_window and self.dictation_controls_window.winfo_exists():
+            self.dictation_controls_window.grab_release()
+            self.dictation_controls_window.destroy()
+        self.dictation_controls_window = None
+        self.dictation_sentences = []
+        self.dictation_index = 0
 
     def wait_and_cleanup(self, audio_file):
         """Wait for playback to finish and cleanup"""
@@ -2361,18 +2588,23 @@ class VocabularyApp:
 
         if additional_label_button:
             button_text, button_command = additional_label_button
-            serial_button = tk.Button(
+            serial_button = ttk.Button(
                 label_row,
                 text=button_text,
-                bg="#ADD8E6",
-                fg="black",
-                activebackground="#9AC9D8",
-                activeforeground="black",
-                font=("Arial", 9, "bold"),
+                style='SerialTranslation.TButton',
                 command=button_command
             )
             serial_button.pack(side=tk.LEFT, padx=(8, 0))
             Tooltip(serial_button, "Translate the newest English sentence into German and append it to the Translation Box.")
+
+            dictation_button = ttk.Button(
+                label_row,
+                text="Dictation",
+                style='SmallGoldYellow.TButton',
+                command=self.show_dictation_source_popup
+            )
+            dictation_button.pack(side=tk.LEFT, padx=(8, 0))
+            Tooltip(dictation_button, "Listen to one Study Text sentence at a time and write it down.")
         
         active_textbox_font = textbox_font if textbox_font is not None else label_font
         if scrollbar:
