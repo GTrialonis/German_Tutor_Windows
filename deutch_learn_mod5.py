@@ -26,6 +26,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import pyperclip
+import matplotlib.pyplot as plt
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -163,6 +164,7 @@ class VocabularyApp:
         self.count_test_num = 0
         self.total_questions = 0
         self.correct_answers = 0
+        self.test_ended = False
         self.flip_mode = False
         self.left_section_font = tkFont.Font(family="Segoe UI", size=10, weight="normal")
         self.textbox_font = tkFont.Font(family="Segoe UI", size=11, weight="normal")
@@ -2166,6 +2168,7 @@ class VocabularyApp:
         ttk.Button(btn_frame2, text="Choose '_VOC.txt' File", style='SmallBlue.TButton', command=self.load_test_file).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Flip Words", style='SmallGoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Clear Test", style='SmallOrange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Load Scores", style='SmallBrightAqua.TButton', command=self.load_score_file).pack(side=tk.LEFT, padx=5)
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
         self.test_filename_label.pack(anchor='w')
@@ -2183,16 +2186,18 @@ class VocabularyApp:
 
         answer_frame = tk.Frame(right_frame, bg="#222")
         answer_frame.pack(fill=tk.X)
-        ttk.Button(answer_frame, text="Next Word", style='SmallBlue.TButton', command=self.next_word).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(answer_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_input).pack(side=tk.LEFT, padx=5)
-        ttk.Button(answer_frame, text="Revise Mistakes", style='SmallGreenish.TButton', command=self.load_revision_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(answer_frame, text="Load Filter Voc.", style='SmallLimeGreen.TButton', command=self.load_filter_vocabulary).pack(side=tk.LEFT, padx=5)
-        tk.Label(answer_frame, text="Score:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
+        button_padx = 2
+        ttk.Button(answer_frame, text="Next Word", style='SmallBlue.TButton', command=self.next_word).pack(side=tk.LEFT, padx=button_padx, pady=5)
+        ttk.Button(answer_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_input).pack(side=tk.LEFT, padx=button_padx)
+        ttk.Button(answer_frame, text="Revise Mistakes", style='SmallGreenish.TButton', command=self.load_revision_file).pack(side=tk.LEFT, padx=button_padx)
+        ttk.Button(answer_frame, text="Load Filter Voc.", style='SmallLimeGreen.TButton', command=self.load_filter_vocabulary).pack(side=tk.LEFT, padx=button_padx)
+        tk.Label(answer_frame, text="Score:", fg="white", bg="#222").pack(side=tk.LEFT, padx=(4, 1))
         self.score_label = tk.Label(answer_frame, text="0%", fg="white", bg="#222")
         self.score_label.pack(side=tk.LEFT)
-        tk.Label(answer_frame, text="Test Question #:", fg="white", bg="#222").pack(side=tk.LEFT, padx=5)
+        tk.Label(answer_frame, text="Test Question #:", fg="white", bg="#222").pack(side=tk.LEFT, padx=(4, 1))
         self.count_test_num_label = tk.Label(answer_frame, text="0", fg="white", bg="#222")
         self.count_test_num_label.pack(side=tk.LEFT)
+        ttk.Button(answer_frame, text="End Test", style='SmallRed.TButton', command=self.end_test).pack(side=tk.LEFT, padx=(4, 2))
 
         # Dictionary Search
         tk.Label(right_frame, text="Search word using AI, the loaded vocabulary, the Filter or Langenscheid", fg="gold", bg="#222").pack(anchor='w', pady=5)
@@ -3269,6 +3274,12 @@ Rules:
             self.count_test_num = 0
             filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         if filename:
+            self.count_test_num = 0
+            self.test_ended = False
+            self.total_questions = 0
+            self.correct_answers = 0
+            self.score = 0
+            self.score_label.config(text="0%")
             self.test_filename_label.config(text=f"File is: {filename}")
             with open(filename, 'r', encoding='utf-8-sig') as file:
                 self.vocabulary = [line.strip() for line in file.readlines() if line.strip()]
@@ -3467,6 +3478,9 @@ Rules:
 
     def check_answer(self, event=None):
         """Check user's answer"""
+        if self.test_ended:
+            return "break" if event else None
+
         user_input_raw = self.answer_entry.get().strip()
         user_answer = user_input_raw.lower()
 
@@ -5485,9 +5499,164 @@ Rules:
         """Open notes editor"""
         NotesEditor(self.root)
 
+    def end_test(self):
+        """End the current vocabulary test and optionally save its score."""
+        if self.test_ended:
+            return
+
+        self.test_ended = True
+        score = self.score if self.total_questions else 0
+        self.answer_entry.delete(0, tk.END)
+
+        popup = tk.Toplevel(self.root)
+        popup.title("Test Complete")
+        popup.configure(bg="#222")
+        popup.transient(self.root)
+        popup.grab_set()
+        popup.resizable(False, False)
+
+        tk.Label(
+            popup,
+            text=f"Your score: {score}% ({self.correct_answers}/{self.total_questions})",
+            bg="#222",
+            fg="white",
+            font=("Arial", 11, "bold")
+        ).pack(padx=24, pady=(18, 8))
+        tk.Label(popup, text="Save Score?", bg="#222", fg="white").pack(pady=(0, 12))
+
+        button_frame = tk.Frame(popup, bg="#222")
+        button_frame.pack(pady=(0, 18), padx=18, fill=tk.X)
+
+        def close_popup():
+            popup.grab_release()
+            popup.destroy()
+
+        ttk.Button(
+            button_frame,
+            text="Yes",
+            style='SmallGreen.TButton',
+            command=lambda: [close_popup(), self.save_score()]
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+        ttk.Button(
+            button_frame,
+            text="No / Exit",
+            style='SmallRed.TButton',
+            command=close_popup
+        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+
+        popup.protocol("WM_DELETE_WINDOW", close_popup)
+
+    def get_score_file_path(self):
+        """Choose the score folder and derive its filename from the vocabulary name."""
+        vocabulary_name = os.path.basename(self.current_voc_file or "")
+        if not vocabulary_name:
+            label_text = self.test_filename_label.cget("text").replace("File is: ", "").strip()
+            vocabulary_name = os.path.basename(label_text)
+
+        if not vocabulary_name:
+            vocabulary_text = self.vocabulary_textbox.get("1.0", tk.END).strip()
+            if vocabulary_text.lower().endswith((".json", ".txt")) and "\n" not in vocabulary_text:
+                vocabulary_name = os.path.basename(vocabulary_text)
+
+        vocabulary_stem = os.path.splitext(vocabulary_name)[0] or "vocabulary"
+        folder = filedialog.askdirectory(title="Choose folder for test scores")
+        if not folder:
+            return None
+        return os.path.join(folder, f"{vocabulary_stem}_scores.json")
+
+    def save_score(self):
+        """Append the completed test score to a vocabulary-specific JSON array."""
+        filename = self.get_score_file_path()
+        if not filename:
+            return
+
+        history = []
+        if os.path.exists(filename):
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    saved_data = json.load(file)
+                history = saved_data if isinstance(saved_data, list) else []
+                if not isinstance(history, list):
+                    history = []
+            except (OSError, json.JSONDecodeError):
+                history = []
+
+        history.append({
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "score": self.correct_answers,
+            "total": self.total_questions
+        })
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as file:
+                json.dump(history, file, indent=2)
+            messagebox.showinfo("Score Saved", f"Score saved to:\n{filename}", parent=self.root)
+        except OSError as error:
+            messagebox.showerror("Save Error", f"Could not save the score:\n{error}", parent=self.root)
+
+    def load_score_file(self):
+        """Load a JSON score history and display it as a bar graph."""
+        filename = filedialog.askopenfilename(
+            title="Load Test Scores",
+            filetypes=[("Score files", "*.json"), ("All files", "*.*")]
+        )
+        if not filename:
+            return
+
+        try:
+            with open(filename, 'r', encoding='utf-8') as file:
+                scores = json.load(file)
+            scores = [
+                item for item in scores
+                if isinstance(item, dict)
+                and isinstance(item.get("score"), (int, float))
+                and isinstance(item.get("total"), (int, float))
+            ] if isinstance(scores, list) else []
+            if not scores:
+                raise ValueError("The selected file contains no scores.")
+            self.show_score_chart(scores, os.path.basename(filename))
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            messagebox.showerror("Load Error", f"Could not load score history:\n{error}", parent=self.root)
+
+    def show_score_chart(self, scores, chart_title):
+        """Display score history as a Matplotlib progress chart."""
+        timestamps = [datetime.fromisoformat(item["timestamp"]) for item in scores]
+        session_numbers = list(range(1, len(scores) + 1))
+        date_labels = [timestamp.strftime("%d%m%y") for timestamp in timestamps]
+        percentages = [
+            (item["score"] / item["total"] * 100) if item["total"] else 0
+            for item in scores
+        ]
+
+        figure, axis = plt.subplots(figsize=(9, 5))
+        bars = axis.bar(session_numbers, percentages, width=0.72, color="#4caf50")
+        axis.set_title(f"Vocabulary Test Progress - {chart_title}")
+        axis.set_xlabel("Test date (ddmmyy)")
+        axis.set_ylabel("Score (%)")
+        axis.set_ylim(0, 100)
+        axis.set_xticks(session_numbers, date_labels)
+        axis.grid(axis="y", alpha=0.3)
+        axis.set_axisbelow(True)
+
+        for bar, item, percentage in zip(bars, scores, percentages):
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                percentage + 2,
+                f"{item['score']}/{item['total']} ({percentage:.0f}%)",
+                ha="center",
+                va="bottom",
+                fontsize=9
+            )
+
+        figure.tight_layout()
+        plt.show(block=False)
+
     def clear_test(self):
         """Clear test section"""
         self.vocabulary = []
+        self.current_word = None
+        self.test_ended = False
+        self.count_test_num = 0
         self.score_label.config(text="0%")
         self.score = 0
         self.total_questions = 0  # Total number of questions asked
