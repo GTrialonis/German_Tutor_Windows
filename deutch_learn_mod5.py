@@ -27,6 +27,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import pyperclip
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -3276,6 +3277,7 @@ Rules:
         if filename:
             self.count_test_num = 0
             self.test_ended = False
+            self.flip_mode = False
             self.total_questions = 0
             self.correct_answers = 0
             self.score = 0
@@ -5584,7 +5586,8 @@ Rules:
         history.append({
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "score": self.correct_answers,
-            "total": self.total_questions
+            "total": self.total_questions,
+            "language_pair": "EN -> DE" if self.flip_mode else "DE -> EN"
         })
 
         try:
@@ -5627,9 +5630,11 @@ Rules:
             (item["score"] / item["total"] * 100) if item["total"] else 0
             for item in scores
         ]
+        language_pairs = [item.get("language_pair", "DE -> EN") for item in scores]
+        bar_colors = ["#8b5a2b" if pair == "EN -> DE" else "#4caf50" for pair in language_pairs]
 
         figure, axis = plt.subplots(figsize=(9, 5))
-        bars = axis.bar(session_numbers, percentages, width=0.72, color="#4caf50")
+        bars = axis.bar(session_numbers, percentages, width=0.72, color=bar_colors)
         axis.set_title(f"Vocabulary Test Progress - {chart_title}")
         axis.set_xlabel("Test date (ddmmyy)")
         axis.set_ylabel("Score (%)")
@@ -5637,6 +5642,10 @@ Rules:
         axis.set_xticks(session_numbers, date_labels)
         axis.grid(axis="y", alpha=0.3)
         axis.set_axisbelow(True)
+        axis.legend(handles=[
+            Patch(facecolor="#4caf50", label="DE -> EN"),
+            Patch(facecolor="#8b5a2b", label="EN -> DE")
+        ])
 
         for bar, item, percentage in zip(bars, scores, percentages):
             axis.text(
@@ -5655,6 +5664,7 @@ Rules:
         """Clear test section"""
         self.vocabulary = []
         self.current_word = None
+        self.flip_mode = False
         self.test_ended = False
         self.count_test_num = 0
         self.score_label.config(text="0%")
