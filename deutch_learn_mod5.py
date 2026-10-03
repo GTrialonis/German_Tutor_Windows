@@ -72,6 +72,9 @@ class Tooltip:
     
     def show_tooltip(self, event=None):
         """Display the tooltip."""
+        if not self.text:
+            return
+
         if self.tooltip:
             return
 
@@ -2576,6 +2579,7 @@ class VocabularyApp:
         try:
             if isinstance(label_text, str) and label_text.strip().startswith("Vocabulary (Current)"):
                 self.vocabulary_label = label
+                self.vocabulary_label_tooltip = Tooltip(label, "")
         except Exception:
             pass
         label.pack(side=tk.LEFT, anchor="w")
@@ -2786,25 +2790,24 @@ class VocabularyApp:
             messagebox.showerror("UI Error", f"Could not write to translation box: {e}")
 
     def update_vocabulary_label_path(self):
-        """Update the Vocabulary label to include the current vocabulary file path (relative to Desktop)."""
+        """Show the current vocabulary filename and keep its full path in a tooltip."""
         if not hasattr(self, 'vocabulary_label'):
             return
 
         if self.current_voc_file:
-            try:
-                home = os.path.expanduser("~")
-                rel = os.path.relpath(self.current_voc_file, home)
-                # Normalize separators and ensure it starts with a backslash as requested
-                rel = rel.replace('/', '\\')
-                display = "\\" + rel
-            except Exception:
-                display = self.current_voc_file
-            new_text = f"Vocabulary (Current): {display}"
+            full_path = os.path.abspath(self.current_voc_file)
+            filename = os.path.basename(full_path)
+            tooltip_path = "\\" + os.path.relpath(full_path, os.path.expanduser("~")).replace("/", "\\")
+            if len(filename) > 40:
+                filename = f"{filename[:18]}...{filename[-19:]}"
+            new_text = f"Vocabulary (Current): {filename}"
         else:
             new_text = "Vocabulary (Current):"
+            tooltip_path = ""
 
         try:
             self.vocabulary_label.config(text=new_text)
+            self.vocabulary_label_tooltip.text = tooltip_path
         except Exception:
             pass
 
