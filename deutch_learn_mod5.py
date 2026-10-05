@@ -268,7 +268,12 @@ class VocabularyApp:
             'SmallGoldenSummer.TButton': {'background': '#d4a373', 'foreground': 'black'},
             'SmallDarkBrown.TButton': {'background': '#8B4513', 'foreground': 'white'},
             'SmallDarkGreen.TButton': {'background': "#3C6605", 'foreground': 'white'},
-            'SmallDarkBlueTurquoise.TButton': {'background': '#005588', 'foreground': 'turquoise'}
+            'SmallDarkBlueTurquoise.TButton': {'background': '#005588', 'foreground': 'turquoise'},
+            'DictationStart.TButton': {'background': '#B7E4C7', 'foreground': 'black'},
+            'DictationRepeat.TButton': {'background': '#D8C7F2', 'foreground': 'black'},
+            'DictationNext.TButton': {'background': '#BDE0FE', 'foreground': 'black'},
+            'DictationCancel.TButton': {'background': '#FFD6A5', 'foreground': 'black'},
+            'DictationStop.TButton': {'background': '#FFADAD', 'foreground': 'black'}
             }
         
         for style_name, colors in color_styles.items():
@@ -1604,7 +1609,15 @@ class VocabularyApp:
         self.dictation_controls_window = controls
         controls.title("Dictation")
         controls.configure(bg="#222")
-        controls.geometry("430x190")
+        controls.update_idletasks()
+        width = 300
+        height = 340
+        root_x = self.root.winfo_rootx()
+        root_y = self.root.winfo_rooty()
+        offset_x = round(self.root.winfo_fpixels("3c"))
+        x = root_x + (self.root.winfo_width() - width) // 2 + offset_x
+        y = root_y + (self.root.winfo_height() - height) // 2
+        controls.geometry(f"{width}x{height}+{x}+{y}")
         controls.transient(self.root)
         controls.grab_set()
 
@@ -1615,42 +1628,50 @@ class VocabularyApp:
             fg="white",
             font=("Arial", 10)
         )
-        status_label.pack(pady=(20, 14))
+        status_label.pack(pady=(16, 10))
 
         button_frame = tk.Frame(controls, bg="#222")
-        button_frame.pack(fill=tk.X, padx=18)
+        button_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=(0, 14))
 
         start_button = ttk.Button(
             button_frame,
             text="Start",
-            style="SmallGreen.TButton",
+            style="DictationStart.TButton",
             command=lambda: self.start_dictation_sentence(status_label, start_button, next_button)
         )
-        start_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+        start_button.pack(fill=tk.X, pady=3)
 
-        stop_button = ttk.Button(
+        repeat_button = ttk.Button(
             button_frame,
-            text="Stop",
-            style="SmallRed.TButton",
-            command=lambda: self.stop_dictation(status_label, start_button, next_button)
+            text="Repeat",
+            style="DictationRepeat.TButton",
+            command=lambda: self.repeat_dictation_sentence(status_label, start_button, next_button)
         )
-        stop_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
-
-        cancel_button = ttk.Button(
-            button_frame,
-            text="Cancel",
-            style="SmallDarkRed.TButton",
-            command=self.cancel_dictation
-        )
-        cancel_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+        repeat_button.pack(fill=tk.X, pady=3)
 
         next_button = ttk.Button(
             button_frame,
             text="Next",
-            style="SmallBlue.TButton",
+            style="DictationNext.TButton",
             command=lambda: self.next_dictation_sentence(status_label, start_button, next_button)
         )
-        next_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=3)
+        next_button.pack(fill=tk.X, pady=3)
+
+        cancel_button = ttk.Button(
+            button_frame,
+            text="Cancel",
+            style="DictationCancel.TButton",
+            command=self.cancel_dictation
+        )
+        cancel_button.pack(fill=tk.X, pady=3)
+
+        stop_button = ttk.Button(
+            button_frame,
+            text="Stop",
+            style="DictationStop.TButton",
+            command=lambda: self.stop_dictation(status_label, start_button, next_button)
+        )
+        stop_button.pack(fill=tk.X, pady=3)
 
         controls.protocol("WM_DELETE_WINDOW", self.cancel_dictation)
 
@@ -1677,6 +1698,16 @@ class VocabularyApp:
                 self.dictation_active and self.dictation_playback_id == playback_id
             )
         )
+
+    def repeat_dictation_sentence(self, status_label, start_button, next_button):
+        """Replay the current sentence without advancing the dictation index."""
+        if not self.dictation_sentences:
+            return
+        self.dictation_active = True
+        start_button.config(state=tk.DISABLED)
+        next_button.config(state=tk.NORMAL)
+        status_label.config(text=f"Dictating sentence {self.dictation_index + 1} of {len(self.dictation_sentences)}")
+        self.read_dictation_sentence()
 
     def stop_dictation(self, status_label, start_button, next_button):
         """Stop playback while keeping the current sentence available."""
