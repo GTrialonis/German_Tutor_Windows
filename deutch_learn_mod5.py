@@ -182,6 +182,7 @@ class VocabularyApp:
 
         # Listening comprehension variables
         self.listening_comprehension_text = ""
+        self.listening_comprehension_active = False
         self.current_questions = []
         self.current_question_index = 0
         self.listening_score = 0
@@ -480,6 +481,8 @@ class VocabularyApp:
         if hasattr(self, 'eval_answer_btn'):
             self.eval_answer_btn.config(state="normal")
         
+        self.listening_comprehension_active = True
+
         # Reset evaluation tracking
         self.evaluated_questions = set()
         
@@ -530,13 +533,14 @@ class VocabularyApp:
         def on_reading_complete():
             """Handle reading completion"""
             controls_window.destroy()
+            self.current_controls_window = None
             self.generate_listening_questions()
         
         play_button = ttk.Button(button_frame, text="Start Reading", 
                                style='SmallGreen.TButton',
                                command=lambda: self.start_reading_with_callback(
                                    text_content, play_button, pause_button, status_label, 
-                                   progress_var, voice, on_reading_complete))
+                                   progress_var, voice, on_reading_complete, controls_window))
         play_button.pack(side=tk.LEFT, padx=(0, 10))
         
         pause_button = ttk.Button(button_frame, text="Pause", 
@@ -545,7 +549,7 @@ class VocabularyApp:
                                 state=tk.DISABLED)
         pause_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        stop_button = ttk.Button(button_frame, text="Stop", 
+        stop_button = ttk.Button(button_frame, text="Exit",
                                style='SmallRed.TButton',
                                command=lambda: self.stop_reading_ui(controls_window, play_button, pause_button, status_label, progress_var))
         stop_button.pack(side=tk.LEFT)
@@ -555,11 +559,13 @@ class VocabularyApp:
         
         self.current_controls_window = controls_window
 
-    def start_reading_with_callback(self, text_content, play_button, pause_button, status_label, progress_var, voice, completion_callback):
+    def start_reading_with_callback(self, text_content, play_button, pause_button, status_label, progress_var, voice, completion_callback, controls_window):
         """Start reading with completion callback"""
         self.toggle_reading(text_content, play_button, pause_button, status_label, progress_var, voice)
         
         def check_reading_complete():
+            if not controls_window.winfo_exists():
+                return
             if not self.is_reading:
                 completion_callback()
             else:
@@ -773,18 +779,30 @@ class VocabularyApp:
 
     def end_listening_comprehension_session(self):
         """End the listening comprehension session"""
-        # Re-enable buttons
+        self.reset_listening_comprehension_state()
+        messagebox.showinfo("Session Complete", "All questions have been evaluated!")
+
+    def reset_listening_comprehension_state(self):
+        """Restore the prompt controls and clear listening comprehension state."""
         if hasattr(self, 'eval_answer_btn'):
             self.eval_answer_btn.config(state="disabled")
         if hasattr(self, 'prompt_ai_button'):
             self.prompt_ai_button.config(state="normal")
-        
-        # Clear session data
+
+        self.listening_comprehension_active = False
         self.current_questions = []
         self.evaluated_questions = set()
         self.current_question_index = 0
-        
-        messagebox.showinfo("Session Complete", "All questions have been evaluated!")
+
+    def cancel_listening_comprehension(self):
+        """Cancel an active listening session and restore the prompt controls."""
+        controls_window = getattr(self, 'current_controls_window', None)
+        if self.listening_comprehension_active:
+            self.stop_reading()
+        if controls_window is not None and controls_window.winfo_exists():
+            controls_window.destroy()
+        self.current_controls_window = None
+        self.reset_listening_comprehension_state()
 
     # === READING COMPREHENSION METHODS ===
 
@@ -1319,13 +1337,16 @@ class VocabularyApp:
             status_label.config(text="Reading...", fg="lightgreen")
 
     def stop_reading_ui(self, controls_window, play_button, pause_button, status_label, progress_var):
-        """Stop reading and clean up UI"""
+        """Exit reading controls and cancel the listening comprehension session."""
         self.stop_reading()
         progress_var.set(0)
         status_label.config(text="Stopped", fg="red")
         play_button.config(state=tk.NORMAL)
         pause_button.config(state=tk.DISABLED, text="Pause")
         controls_window.destroy()
+        if getattr(self, 'current_controls_window', None) is controls_window:
+            self.current_controls_window = None
+        self.reset_listening_comprehension_state()
 
     def stop_reading(self):
         """Stop reading completely"""
@@ -5142,6 +5163,7 @@ Rules:
 
     def reset_session(self):
         """Reset session: clear the main text boxes and reset file paths."""
+        self.cancel_listening_comprehension()
         try:
             self.clear_vocabulary()
         except Exception:
