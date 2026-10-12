@@ -2001,7 +2001,7 @@ class VocabularyApp:
         popup = tk.Toplevel(self.root)
         popup.title("Translate Options")
         popup.configure(bg="#222")
-        popup.geometry("400x150")
+        popup.geometry("650x150")
         
         # Center the window
         popup.update_idletasks()
@@ -2047,6 +2047,22 @@ class VocabularyApp:
             command=lambda: [self.capture_text(), popup.destroy()]
         )
         btn_textbox.pack(side=tk.LEFT, padx=10)
+
+        # Button 3: Translate clipboard contents (pastel green)
+        btn_clipboard = tk.Button(
+            button_frame,
+            text="Translate contents of\nClipboard",
+            bg="#B7E4C7",
+            fg="#333333",
+            font=("Arial", 11, "bold"),
+            width=20,
+            height=2,
+            cursor="hand2",
+            activebackground="#A5D8B8",
+            activeforeground="#333333",
+            command=lambda: [self.translate_clipboard(), popup.destroy()]
+        )
+        btn_clipboard.pack(side=tk.LEFT, padx=10)
 
     def load_recent(self):
         """Open notebook popup for writing short stories, essays, etc."""
@@ -5404,25 +5420,47 @@ Rules:
 
     def capture_text(self):
         """Translate text using AI"""
-        """
-        Read English input from the GUI, translate to German using OpenAI, and display the result.
-        """
         original_text = self.study_textbox.get("1.0", tk.END).strip()
         if not original_text:
             messagebox.showwarning("Input Empty", "Please enter text in the 'Study Text' box.")
             return
 
+        self._translate_text(original_text)
+
+    def translate_clipboard(self):
+        """Translate the current clipboard text using AI."""
         try:
-            prompt = ("""You are an expert translator, fluent in English and German. If the given text is in German, translate it into English.
+            original_text = self.root.clipboard_get().strip()
+        except tk.TclError as e:
+            messagebox.showerror(
+                "Clipboard Error",
+                f"Could not read text from the clipboard: {e}",
+                parent=self.root
+            )
+            return
+
+        if not original_text:
+            messagebox.showwarning(
+                "Clipboard Empty",
+                "Please copy text to the clipboard before translating.",
+                parent=self.root
+            )
+            return
+
+        self._translate_text(original_text)
+
+    def _translate_text(self, original_text):
+        """Translate text and append the result to the Translation Text Box."""
+        try:
+            prompt = (
+                """You are an expert translator, fluent in English and German. If the given text is in German, translate it into English.
                 If the given text is in English then translate it into German. Just give me the most common expression for everyday speech \
                     unless the English is more formal or uses scientific jargon:\n\n"""
                 f"English: \"{original_text}\"\n\nGerman:"
             )
             translated = self.ask_chatgpt(prompt, model_name="gpt-5.5")
 
-            self.translation_textbox.delete(1.0, tk.END)
             self.translation_textbox.insert(tk.END, translated)
-
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Translation Error", f"An error occurred: {e}")
 
