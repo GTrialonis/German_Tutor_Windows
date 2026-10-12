@@ -294,6 +294,17 @@ class VocabularyApp:
             background=[('active', 'white'), ('pressed', 'white')],
             foreground=[('active', 'black'), ('pressed', 'black')]
         )
+        self.style.configure(
+            'SwapText.TButton',
+            background='#25C2A0',
+            foreground='#08201B',
+            font=('Arial', 10, 'bold')
+        )
+        self.style.map(
+            'SwapText.TButton',
+            background=[('active', '#45E0BD'), ('pressed', '#1BA889')],
+            foreground=[('active', '#08201B'), ('pressed', '#08201B')]
+        )
 
     def load_recent_voc_files(self):
         """Load recent vocabulary files from disk"""
@@ -2778,8 +2789,30 @@ class VocabularyApp:
             )
             en_to_de_btn.pack(side='left', padx=(10, 3), pady=3)
             Tooltip(en_to_de_btn, "Click to generate English text from your vocabulary to practice translating into German.")
+
+            swap_text_btn = ttk.Button(
+                button_frame,
+                text="Swap TXT ⇄ TRA",
+                style='SwapText.TButton',
+                command=self.swap_study_and_translation_text
+            )
+            swap_text_btn.pack(side='left', padx=3, pady=3)
+            Tooltip(
+                swap_text_btn,
+                "Swap the contents of the Study Text Box with those of the Translation Box."
+            )
         
         return textbox
+
+    def swap_study_and_translation_text(self):
+        """Exchange the contents of the Study Text Box and Translation Box."""
+        study_text = self.study_textbox.get("1.0", "end-1c")
+        translation_text = self.translation_textbox.get("1.0", "end-1c")
+
+        self.study_textbox.delete("1.0", tk.END)
+        self.study_textbox.insert("1.0", translation_text)
+        self.translation_textbox.delete("1.0", tk.END)
+        self.translation_textbox.insert("1.0", study_text)
 
     def create_english_text_for_translation(self):
         """Use current vocabulary to generate ~10-line English text for German translation practice."""
