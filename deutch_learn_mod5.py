@@ -3435,6 +3435,12 @@ Rules:
         """Toggle between German->English and English->German testing"""
         self.flip_mode = not self.flip_mode
         self.count_test_num = 0
+        if self.test_ended:
+            self.test_ended = False
+            self.total_questions = 0
+            self.correct_answers = 0
+            self.score = 0
+            self.score_label.config(text="0%")
         self.display_random_word()
 
     def next_word(self):
