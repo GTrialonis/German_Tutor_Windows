@@ -5026,6 +5026,22 @@ Rules:
             )
             if not filename:
                 return False
+        else:
+            choice = messagebox.askyesnocancel(
+                "Save Options",
+                f"Overwrite existing file?\n{filename}\n\n"
+                "Yes = Overwrite\nNo = Save as new file\nCancel = Abort"
+            )
+            if choice is None:
+                return False
+            if not choice:
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt")],
+                    initialfile=""
+                )
+                if not filename:
+                    return False
 
         filename = self.ensure_text_filename(filename, '_TRA')
         try:
