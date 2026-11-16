@@ -1838,17 +1838,16 @@ class VocabularyApp:
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=5)
 
         # Example Sentences
-        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using the AI or the Glosbe dictionary", True, height=6)
+        self.example_sentences_textbox = self.create_labeled_textbox(right_frame, "Find example sentences using AI, or Load and Append examples", True, height=6)
 
-        # New Input Box for Glosbe Search
-        self.glosbe_search_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
-        self.glosbe_search_entry.pack(fill=tk.X, padx=10, pady=5)
+        # Word for AI example sentences
+        self.example_word_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
+        self.example_word_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Buttons for Example Sentences
         btn_frame = tk.Frame(right_frame, bg="#222")
         btn_frame.pack(fill=tk.X)
         ttk.Button(btn_frame, text="AI Examples", style='SmallDarkPurple.TButton', command=self.fetch_ai_examples).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Glosbe Examples", style='SmallOliveGreen.TButton', command=self.fetch_glosbe_examples).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Load Examples", style='SmallBlue.TButton', command=self.load_examples).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Append", style='SmallGreen.TButton', command=self.save_examples).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_examples_input).pack(side=tk.LEFT, padx=5)
@@ -1893,7 +1892,7 @@ class VocabularyApp:
         self.count_test_num_label.pack(side=tk.LEFT)
 
         # Dictionary Search
-        tk.Label(right_frame, text="Search word using AI or Langenscheid online dictionary", fg="gold", bg="#222").pack(anchor='w', pady=5)
+        tk.Label(right_frame, text="Search word using AI or the loaded vocabulary", fg="gold", bg="#222").pack(anchor='w', pady=5)
         self.dictionary_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.dictionary_entry.pack(fill=tk.X)
         self.dictionary_entry.bind("<Return>", self.search_own_vocab)
@@ -1901,7 +1900,6 @@ class VocabularyApp:
         dict_btn_frame = tk.Frame(right_frame, bg="#222")
         dict_btn_frame.pack(fill=tk.X)
         ttk.Button(dict_btn_frame, text="AI word translation", style='SmallDarkPurple.TButton', command=self.ai_translate_word).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(dict_btn_frame, text="Langenscheidt", style='SmallGrayBlue.TButton', command=self.fetch_langenscheidt).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Search vocabulary (Current).", style='SmallDarkOlive.TButton', command=self.search_own_vocab).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Search Filter", style='SmallLimeGreen.TButton', command=self.search_filter).pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(dict_btn_frame, text="Clear Input", style='SmallOrange.TButton', command=self.clear_entry).pack(side=tk.LEFT, padx=5)
@@ -2644,7 +2642,7 @@ Rules:
             return
 
         self.current_word = random.choice(self.vocabulary)
-        self.glosbe_search_entry.delete(0, tk.END)
+        self.example_word_entry.delete(0, tk.END)
         self.test_textbox.delete(1.0, tk.END)
         self.test_textbox.insert(tk.END, "Please translate the following:\n")
 
@@ -2663,7 +2661,7 @@ Rules:
             self.test_textbox.insert(tk.END, f"--> {english_part}\n")
         else:
             self.test_textbox.insert(tk.END, f"--> {german_part}\n")
-            self.glosbe_search_entry.insert(tk.END, f"{german_part}\n")
+            self.example_word_entry.insert(tk.END, f"{german_part}\n")
 
         self.answer_entry.delete(0, tk.END)
 
@@ -3207,7 +3205,7 @@ Rules:
         """
         import random
 
-        entry = self.glosbe_search_entry.get().strip()
+        entry = self.example_word_entry.get().strip()
         if not entry:
             return
 
@@ -3238,75 +3236,6 @@ Rules:
 
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Examples Error", f"An error occurred: {e}")
-
-    def fetch_glosbe_examples(self):
-        """Get example sentences from Glosbe"""
-        word = self.glosbe_search_entry.get().strip()
-        if not word:
-            return
-
-        url = f"https://glosbe.com/de/en/{word}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            self.example_sentences_textbox.insert(tk.END, f"Failed to retrieve the page. Status code: {response.status_code}\n")
-            return
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        examples_list = []
-
-        for example in soup.find_all('div', class_='mt-1 w-full flex text-gray-900 text-sm py-1 px-2 dir-aware-border-start-2 border-gray-300 translation__example'):
-            german_p = example.find('p', class_='w-1/2 dir-aware-pr-1')
-            german = german_p.text.strip() if german_p else "N/A"
-
-            english_p = example.find('p', class_='w-1/2 px-1 ml-2')
-            english = english_p.text.strip() if english_p else "N/A"
-
-            example_pair = f"{german} = {english}\n\n"
-            examples_list.append(example_pair)
-
-        self.example_sentences_textbox.delete(1.0, tk.END)
-        for example in examples_list:
-            self.example_sentences_textbox.insert(tk.END, example)
-
-    def fetch_langenscheidt(self):
-        """Search word in Langenscheidt dictionary"""
-        word = self.dictionary_entry.get().strip()
-        if not word:
-            return
-
-        url = f"https://en.langenscheidt.com/german-english/{word}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            self.vocabulary_textbox.insert(tk.END, f"Failed to retrieve the page. Status code: {response.status_code}\n")
-            return
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        myList = []
-
-        for transl in soup.find_all('a', class_='blue'):
-            myStr = transl.find('span', class_='btn-inner').text
-            article = soup.find('span', class_='full').text
-            if article == 'Femininum | feminine':
-                article = 'die'
-            elif article == 'Maskulinum | masculine':
-                article = 'der'
-            elif article == 'Neutrum | neuter':
-                article = 'das'
-            else:
-                article = ''
-            myStr = myStr.strip()
-            myList.append(myStr)
-
-        meaning = ', '.join(myList)
-        self.vocabulary_textbox.insert(tk.END, f"{word}, {article} = {meaning}\n")
 
     def ai_translate_word(self):
         """
@@ -4322,7 +4251,7 @@ Rules:
 
     def clear_examples_input(self):
         """Clear examples input"""
-        self.glosbe_search_entry.delete(0, tk.END)
+        self.example_word_entry.delete(0, tk.END)
 
     def save_ai_responses(self):
         if not self.current_ai_responses_file:

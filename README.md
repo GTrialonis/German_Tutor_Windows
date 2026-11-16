@@ -26,7 +26,7 @@ This is a Python-based German language tutoring application that leverages AI fo
 - Study text loading, saving, and translation
 - Free-hand translation capture
 - Vocabulary testing mode with scoring
-- AI-powered word translation and online dictionary search (Langenscheidt, Glosbe)
+- AI-powered word translation
 - AI responses to user prompts
 
 ## Prerequisites
