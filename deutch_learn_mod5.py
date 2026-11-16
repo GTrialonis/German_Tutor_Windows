@@ -2740,11 +2740,11 @@ class VocabularyApp:
             if label_text == "Study Text Box:":
                 reading_comp_btn = ttk.Button(
                     button_frame,
-                    text="READING Comprehension",
+                    text="READING Compreh.",
                     style='SmallPurple.TButton',
                     command=self.show_reading_comprehension_options
                 )
-                reading_comp_btn.pack(side='left', padx=(15, 3), pady=3)
+                reading_comp_btn.pack(side='left', padx=(2, 3), pady=3)
                 Tooltip(reading_comp_btn, "Click to answer questions about the entire text or about the selected (Ctrl+C) text in the clipboard")
                 
                 ttk.Button(
@@ -2752,23 +2752,23 @@ class VocabularyApp:
                     text="Resume Reading",
                     style='SmallBrightAqua.TButton',
                     command=self.resume_reading_session
-                ).pack(side='left', padx=3, pady=3)
+                ).pack(side='left', padx=2, pady=3)
                 
                 ttk.Button(
                     button_frame,
                     text="Clear Saved Session",
                     style='SmallDarkRed.TButton',
                     command=self.clear_saved_session
-                ).pack(side='left', padx=3, pady=3)
+                ).pack(side='left', padx=2, pady=3)
             
             
             if label_text == "Study Text Box:":
                 ttk.Button(
                     button_frame,
-                    text="LISTENING Comprehension",
+                    text="LISTENING Compreh.",
                     style='SmallGoldYellow.TButton',
                     command=self.create_listening_comprehension
-                ).pack(side='left', padx=(15, 3), pady=3)
+                ).pack(side='left', padx=(2, 3), pady=3)
 
             # Add Listen-to-Translation button for the Translation Box
             if label_text == "Translation Box:":
@@ -5314,11 +5314,11 @@ Rules:
                 "CRITICAL VERB RULES (MUST FOLLOW):\n\n"
                 "- The part inside the square brackets MUST contain exactly TWO German forms:\n"
                 "  1. First: Präteritum (1st/3rd person singular),\n"
-                "  2. Second: Partizip II (past participle only, WITHOUT \"hat\"/\"ist\").\n\n"
+                "  2. Second: Partizip II (past participle only, WITHOUT \"hat\"/\"ist\").\n"
                 "- Do NOT include any auxiliary verbs in the brackets.\n"
                 "- Always start each English translation with \"to\". Maximum three translations.\n"
                 "- If uncertain, still give your best guess for [Präteritum, Partizip II] but ALWAYS keep the same format.\n"
-                "- Examples and required output format: Infinitive, [Präteritum, Partizip II] = to ..., to ...\n\n"
+                "- Examples and required output format: Infinitive, [Präteritum, Partizip II] = to ..., to ...\n"
             )
 
             # Step 1: Ask which lines are verbs
