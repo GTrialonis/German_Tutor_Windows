@@ -3558,7 +3558,7 @@ Rules:
             messagebox.showerror("Filter Error", f"Failed to update filter file: {e}", parent=self.root)
 
     def append_word_to_filter(self):
-        """Append the matching German noun or verb entry from AI responses to the filter."""
+        """Append the matching translation shown in AI responses to the filter."""
         word = self.dictionary_entry.get().strip()
         if not word:
             messagebox.showwarning("No word", "Please enter a word to append.", parent=self.root)
@@ -3570,40 +3570,91 @@ Rules:
             messagebox.showerror("AI Responses Error", f"Could not read AI responses: {e}", parent=self.root)
             return
 
-        entry_pattern = re.compile(
-            r"[^,\r\n]+,\s*(?:(?:der|die|das),\s*)?\[[^\]\r\n]+,\s*[^\]\r\n]+\]\s*=\s*\S.*",
-            flags=re.IGNORECASE,
-        )
+        def german_headword(german_entry):
+            headword = german_entry.split(",", 1)[0].strip()
+            return re.sub(r"\s+\([^()]*\)$", "", headword).strip()
+
         entry = None
-        for line in responses.splitlines():
+        response_lines = responses.splitlines()
+        for line_number, line in enumerate(response_lines):
             candidate = line.strip()
             if candidate[:3].casefold() == "ai:":
                 candidate = candidate[3:].strip()
-            if not entry_pattern.fullmatch(candidate):
+            entry_match = re.fullmatch(r"(.+?)\s*=\s*(\S.*)", candidate)
+            if entry_match:
+                german_entry = entry_match.group(1).strip()
+                german_word = german_headword(german_entry)
+                if german_word.casefold() == word.casefold():
+                    entry = (
+                        f"{german_word} = {entry_match.group(2).strip()}"
+                        if german_word != german_entry.split(",", 1)[0].strip()
+                        else candidate
+                    )
                 continue
-            german_word = candidate.split(",", 1)[0].strip()
-            if german_word.casefold() == word.casefold():
-                entry = candidate
+
+            found_match = re.match(
+                r"^(?:\[FILTER\]\s*)?Found:\s*(.+)$",
+                line.strip(),
+                flags=re.IGNORECASE,
+            )
+            if not found_match:
+                continue
+
+            detail_line_number = line_number + 1
+            while detail_line_number < len(response_lines) and not response_lines[detail_line_number].strip():
+                detail_line_number += 1
+            if detail_line_number >= len(response_lines):
+                continue
+
+            detail_match = re.match(
+                r"^(Meanings|German):\s*(.+)$",
+                response_lines[detail_line_number].strip(),
+                flags=re.IGNORECASE,
+            )
+            if not detail_match:
+                continue
+
+            found_value = found_match.group(1).strip()
+            detail_value = detail_match.group(2).strip()
+            if detail_match.group(1).casefold() == "german":
+                german_entry = detail_value
+                english_meanings = found_value
+                found_word_matches = word.casefold() in {
+                    item.strip().casefold() for item in found_value.split(",")
+                }
+            else:
+                german_entry = found_value
+                english_meanings = detail_value
+                found_word_matches = False
+
+            german_word = german_headword(german_entry)
+            if german_word.casefold() == word.casefold() or found_word_matches:
+                normalized_entry = (
+                    f"{german_word} = {english_meanings}"
+                    if german_word != german_entry.split(",", 1)[0].strip()
+                    else f"{german_entry} = {english_meanings}"
+                )
+                entry = normalized_entry
 
         if entry is None:
             messagebox.showwarning(
                 "Translation not found",
-                f"No matching formatted translation for '{word}' was found in AI Responses. "
-                "Translate the word first, then append it.",
+                f"No translation for '{word}' was found in AI Responses.",
                 parent=self.root,
             )
             return
 
         filter_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
+        entry_word = german_headword(entry.split('=', 1)[0])
         try:
             if os.path.exists(filter_path):
                 with open(filter_path, 'r', encoding='utf-8-sig') as f:
                     for line in f:
-                        existing_word = line.split('=', 1)[0].split(',', 1)[0].strip()
-                        if existing_word.casefold() == word.casefold():
+                        existing_word = german_headword(line.split('=', 1)[0])
+                        if existing_word.casefold() == entry_word.casefold():
                             messagebox.showinfo(
                                 "Already in filter",
-                                f"'{word}' is already in Voc-Filter_VOC.txt.",
+                                f"'{entry_word}' is already in Voc-Filter_VOC.txt.",
                                 parent=self.root,
                             )
                             return
@@ -5251,45 +5302,133 @@ Rules:
             self.root.destroy()
 
     def beautify_vocabulary(self):
-        """Beautify vocabulary: remove preceding numbers and duplicates"""
-        import re
-        
-        # Get content from the textbox
-        content = self.vocabulary_textbox.get(1.0, tk.END)
-        
-        # Process the content to remove duplicates while preserving order
+        """Choose which vocabulary to beautify."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Beautify Vocabulary")
+        popup.configure(bg="#222")
+        popup.geometry("320x180")
+        popup.transient(self.root)
+        popup.grab_set()
+
+        tk.Label(
+            popup,
+            text="Choose a vocabulary to beautify:",
+            bg="#222",
+            fg="white",
+        ).pack(pady=(12, 8))
+
+        def beautify_current():
+            popup.destroy()
+            self.beautify_current_vocabulary()
+
+        def select_other():
+            popup.destroy()
+            filename = filedialog.askopenfilename(
+                title="Select Other Vocabulary",
+                filetypes=[
+                    ("Vocabulary files", "*_VOC.txt"),
+                    ("Text files", "*.txt"),
+                    ("All files", "*.*"),
+                ],
+                parent=self.root,
+            )
+            if filename:
+                self.beautify_vocabulary_file(filename)
+
+        def cancel():
+            popup.destroy()
+
+        ttk.Button(
+            popup,
+            text="Current Vocabulary",
+            style="SmallBlue.TButton",
+            command=beautify_current,
+        ).pack(fill=tk.X, padx=20, pady=3)
+        ttk.Button(
+            popup,
+            text="Select Other Vocabulary",
+            style="SmallGrayBlue.TButton",
+            command=select_other,
+        ).pack(fill=tk.X, padx=20, pady=3)
+        ttk.Button(
+            popup,
+            text="Cancel",
+            style="SmallRed.TButton",
+            command=cancel,
+        ).pack(fill=tk.X, padx=20, pady=3)
+        popup.protocol("WM_DELETE_WINDOW", cancel)
+
+    @staticmethod
+    def _beautify_vocabulary_content(content):
+        """Remove leading numbers and duplicate non-empty lines, preserving order."""
         seen = set()
         unique_lines = []
-        
+        non_empty_line_count = 0
+
         for line in content.splitlines():
-            # Strip whitespace and skip empty lines
             stripped_line = line.strip()
             if not stripped_line:
                 continue
-            
-            # Remove preceding numbers (e.g., "1. ", "23. ")
-            # This regex removes any number followed by a period and optional whitespace at the start
+            non_empty_line_count += 1
+
             cleaned_line = re.sub(r'^\d+\.\s*', '', stripped_line)
-                
-            # Only add if we haven't seen this line before
             if cleaned_line not in seen:
                 seen.add(cleaned_line)
                 unique_lines.append(cleaned_line)
-        
-        # Join with newlines and update the textbox (preserve original order, don't sort)
-        beautified_content = '\n'.join(unique_lines) + '\n'  # Add final newline
+
+        return '\n'.join(unique_lines) + '\n', non_empty_line_count - len(unique_lines)
+
+    def beautify_current_vocabulary(self):
+        """Beautify the vocabulary currently displayed in its textbox."""
+        content = self.vocabulary_textbox.get(1.0, tk.END)
+        beautified_content, duplicate_count = self._beautify_vocabulary_content(content)
         self.vocabulary_textbox.delete(1.0, tk.END)
         self.vocabulary_textbox.insert(tk.END, beautified_content)
-        
-        # Show how many duplicates were removed
-        duplicate_count = len(content.splitlines()) - len(unique_lines)
+
         if duplicate_count > 0:
-            messagebox.showinfo("Beautify Complete", 
-                            f"Removed {duplicate_count} duplicate entries\n"
-                            f"Removed preceding numbers from entries")
+            messagebox.showinfo(
+                "Beautify Complete",
+                f"Removed {duplicate_count} duplicate entries\n"
+                "Removed preceding numbers from entries",
+                parent=self.root,
+            )
         else:
-            messagebox.showinfo("Beautify Complete", 
-                            f"Removed preceding numbers from entries")
+            messagebox.showinfo(
+                "Beautify Complete",
+                "Removed preceding numbers from entries",
+                parent=self.root,
+            )
+
+    def beautify_vocabulary_file(self, filename):
+        """Beautify and overwrite a selected vocabulary file."""
+        try:
+            with open(filename, "r", encoding="utf-8-sig") as file:
+                content = file.read()
+        except Exception as e:
+            messagebox.showerror(
+                "Beautify Error",
+                f"Could not read the selected vocabulary file:\n{e}",
+                parent=self.root,
+            )
+            return
+
+        beautified_content, duplicate_count = self._beautify_vocabulary_content(content)
+        try:
+            with open(filename, "w", encoding="utf-8-sig") as file:
+                file.write(beautified_content)
+        except Exception as e:
+            messagebox.showerror(
+                "Beautify Error",
+                f"Could not update the selected vocabulary file:\n{e}",
+                parent=self.root,
+            )
+            return
+
+        message = f"Beautified vocabulary file:\n{filename}"
+        if duplicate_count > 0:
+            message += f"\n\nRemoved {duplicate_count} duplicate entries."
+        message += "\nRemoved preceding numbers from entries."
+        messagebox.showinfo("Beautify Complete", message, parent=self.root)
 
     def fix_verbs(self):
         """Use the AI to find German verbs in the current Vocabulary textbox,
