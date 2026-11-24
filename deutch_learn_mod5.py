@@ -1941,7 +1941,7 @@ class VocabularyApp:
         ttk.Button(vocab_btn_frame, text="SAVE-VOC", style='SmallGreen.TButton', command=self.save_vocabulary).pack(pady=2)
         beautify_btn = ttk.Button(vocab_btn_frame, text="Beautify", style='SmallGoldBrown.TButton', command=self.beautify_vocabulary)
         beautify_btn.pack(pady=2)
-        Tooltip(beautify_btn, "Click to remove preceding numbers, if any, and duplicate entries.")
+        Tooltip(beautify_btn, "Beautify only the current vocabulary: remove blank lines and list prefixes, normalize spacing, and remove duplicates.")
         fix_verbs_btn = ttk.Button(vocab_btn_frame, text="Fix Verbs", style='SmallOliveGreen.TButton', command=self.fix_verbs)
         fix_verbs_btn.pack(pady=2)
         Tooltip(fix_verbs_btn, "Find all verbs and format them as: infinitive, Präteritum, Partizip II. Append them at the end of the vocabulary.")
@@ -2231,6 +2231,7 @@ class VocabularyApp:
         # Word for AI example sentences
         self.example_word_entry = tk.Entry(right_frame, bg="black", fg="white", insertbackground="white", font=("Helvetica", 11))
         self.example_word_entry.pack(fill=tk.X, padx=10, pady=5)
+        self.example_word_entry.bind("<Return>", self.fetch_ai_examples)
 
         # Buttons for Example Sentences
         btn_frame = tk.Frame(right_frame, bg="#222")
@@ -2252,6 +2253,7 @@ class VocabularyApp:
         ttk.Button(btn_frame2, text="Flip Words", style='SmallGoldBrown.TButton', command=self.toggle_flip_mode).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Clear Test", style='SmallOrange.TButton', command=self.clear_test).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame2, text="Load Scores", style='SmallBrightAqua.TButton', command=self.load_score_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame2, text="Revise Current Mistakes", style='SmallGreenish.TButton', command=self.revise_current_mistakes).pack(side=tk.LEFT, padx=5)
 
         self.test_filename_label = tk.Label(test_frame, text="File is:", fg="white", bg="#222")
         self.test_filename_label.pack(anchor='w')
@@ -2969,15 +2971,31 @@ class VocabularyApp:
 
     def find_word_in_vocabulary(self, word):
         """Search the current Vocabulary Box for the selected word and highlight the match."""
-        vocab_content = self.vocabulary_textbox.get("1.0", tk.END).strip()
-        if not vocab_content:
+        vocab_content = self.vocabulary_textbox.get("1.0", tk.END)
+        if not vocab_content.strip():
             messagebox.showwarning("No Vocabulary", "Vocabulary Box is empty. Load vocabulary first.")
             return
 
         self.vocabulary_textbox.tag_remove("search_highlight", "1.0", tk.END)
         position = self.vocabulary_textbox.search(word, "1.0", stopindex=tk.END, regexp=False)
+        matched_word = word
+        if not position:
+            for suffix in ("en", "er", "es", "em", "e"):
+                if word.casefold().endswith(suffix) and len(word) - len(suffix) >= 3:
+                    stem = word[:-len(suffix)]
+                    pattern = re.compile(rf"(?<!\w){re.escape(stem)}(?!\w)", re.IGNORECASE)
+                    for line_number, line in enumerate(vocab_content.splitlines(), start=1):
+                        german_entry = line.split("=", 1)[0]
+                        match = pattern.search(german_entry)
+                        if match:
+                            position = f"{line_number}.{match.start()}"
+                            matched_word = match.group(0)
+                            break
+                if position:
+                    break
+
         if position:
-            end = f"{position}+{len(word)}c"
+            end = f"{position}+{len(matched_word)}c"
             self.vocabulary_textbox.tag_add("search_highlight", position, end)
             self.vocabulary_textbox.see(position)
             self.vocabulary_textbox.focus_set()
@@ -3164,7 +3182,9 @@ Rules:
             Format: German Word = translation1, translation2, translation3
 
             Example: oft = often, frequently
-6) All output should be in plain text."""
+6) All output should be in plain text.
+7) Preserve the order of first appearance in the source text. For each vocabulary entry, use the first occurrence of the word or inflected form represented by its dictionary form. Do not alphabetize, group by part of speech, or reorder by frequency. For example, if "winziges" appears before "Schatz" in the source text, the entry for "winzig" must appear before the entry for "Schatz".
+8) Output exactly one vocabulary entry per line, with no blank lines between entries."""
 
             response = self.client.chat.completions.create(
                 model="gpt-5.5",
@@ -3173,7 +3193,10 @@ Rules:
                     {"role": "user", "content": f"{prompt}\n\n{content}"}
                 ]
             )
-            auto_vocabulary = response.choices[0].message.content
+            auto_vocabulary = response.choices[0].message.content or ""
+            auto_vocabulary = "\n".join(
+                line.strip() for line in auto_vocabulary.splitlines() if line.strip()
+            )
 
             self.vocabulary_textbox.delete(1.0, tk.END)
             self.vocabulary_textbox.insert(tk.END, auto_vocabulary)
@@ -3761,6 +3784,73 @@ Rules:
             with open(file_path, 'a', encoding='utf-8-sig') as f:
                 f.write(missed_line + "\n")
 
+        current_mistakes_path = os.path.join(script_dir, "current_mistakes_TXT.txt")
+        try:
+            with open(current_mistakes_path, 'r', encoding='utf-8-sig') as f:
+                current_mistakes = f.read().splitlines()
+        except FileNotFoundError:
+            current_mistakes = []
+        except Exception as e:
+            messagebox.showerror(
+                "Mistake Save Error",
+                f"Could not read the current mistakes file:\n{e}",
+                parent=self.root,
+            )
+            return
+
+        if missed_line.casefold() not in {line.strip().casefold() for line in current_mistakes}:
+            try:
+                with open(current_mistakes_path, 'a', encoding='utf-8-sig') as f:
+                    f.write(missed_line + "\n")
+            except Exception as e:
+                messagebox.showerror(
+                    "Mistake Save Error",
+                    f"Could not save the missed word:\n{e}",
+                    parent=self.root,
+                )
+
+    def revise_current_mistakes(self):
+        """Load the accumulated mistakes and start a new vocabulary test."""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(script_dir, "current_mistakes_TXT.txt")
+
+        try:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                mistakes = [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            messagebox.showinfo(
+                "No Current Mistakes",
+                "No current mistakes have been saved yet.",
+                parent=self.root,
+            )
+            return
+        except Exception as e:
+            messagebox.showerror(
+                "Mistake Load Error",
+                f"Could not load the current mistakes file:\n{e}",
+                parent=self.root,
+            )
+            return
+
+        if not mistakes:
+            messagebox.showinfo(
+                "No Current Mistakes",
+                "The current mistakes file is empty.",
+                parent=self.root,
+            )
+            return
+
+        self.vocabulary = mistakes
+        self.count_test_num = 0
+        self.test_ended = False
+        self.flip_mode = False
+        self.total_questions = 0
+        self.correct_answers = 0
+        self.score = 0
+        self.score_label.config(text="0%")
+        self.test_filename_label.config(text=f"File is: {file_path}")
+        self.display_random_word()
+
     def load_filter_vocabulary(self):
         """Load filter vocabulary from Voc-Filter_VOC.txt into the Vocabulary textbox"""
         filter_file_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
@@ -4221,7 +4311,7 @@ Rules:
         """Clear all search highlights"""
         self.vocabulary_textbox.tag_remove("search_highlight", "1.0", tk.END)
 
-    def fetch_ai_examples(self):
+    def fetch_ai_examples(self, event=None):
         """
         Get up to two varied example sentences for a German word, with English translations.
         """
@@ -4229,7 +4319,7 @@ Rules:
 
         entry = self.example_word_entry.get().strip()
         if not entry:
-            return
+            return "break" if event else None
 
         # Add a bit of random context to encourage varied responses
         variation_hints = [
@@ -4258,6 +4348,7 @@ Rules:
 
         except Exception as e:
             self.root.after(0, messagebox.showerror, "Examples Error", f"An error occurred: {e}")
+        return "break" if event else None
 
     def ai_translate_word(self):
         """
@@ -4343,58 +4434,56 @@ Rules:
         self.ai_responses_textbox.see(tk.END)
 
     def search_filter(self, event=None):
-        """Search in the filter vocabulary file"""
-        # Get the word to search from the input field
-        search_word = self.dictionary_entry.get().strip().lower()
-        
+        """Display all filter entries containing the searched word or phrase."""
+        search_word = self.dictionary_entry.get().strip()
         if not search_word:
             messagebox.showwarning("Warning", "Please enter a word to search")
             return
-        
-        # Path to the filter vocabulary file
+
         filter_file_path = r'C:\Users\George\Desktop\MeinDeutsch_Windows\Voc-Filter_VOC.txt'
-        
+
         try:
-            # Read the filter vocabulary file
-            with open(filter_file_path, 'r', encoding='utf-8') as f:
-                filter_content = f.read()
+            with open(filter_file_path, 'r', encoding='utf-8-sig') as file:
+                filter_lines = file.readlines()
         except FileNotFoundError:
             messagebox.showerror("Error", f"Filter file not found: {filter_file_path}")
             return
         except Exception as e:
             messagebox.showerror("Error", f"Error reading filter file: {str(e)}")
             return
-        
-        # Initialize result
-        result = ""
-        
-        # Search through each line of the filter vocabulary
-        for line in filter_content.split('\n'):
-            if '=' in line:  # Only process lines with translations
-                left_side = line.split('=')[0].strip()
-                right_side = line.split('=')[1].strip()
-                
-                # Check if search word is German (left side)
-                german_words = left_side.split(',')[0].strip().lower()
-                if search_word == german_words.lower():
-                    # Found German word, return English meanings
-                    result = f"[FILTER] Found: {left_side}\nMeanings: {right_side}\n\n"
-                    break
-                    
-                # Check if search word is English (right side)
-                english_words = [w.strip().lower() for w in right_side.split(',')]
-                if search_word in english_words:
-                    # Found English word, return German equivalent
-                    result = f"[FILTER] Found: {right_side}\nGerman: {left_side}\n\n"
-                    break
-        
-        # Display results in AI responses textbox
-        if result:
-            self.ai_responses_textbox.insert(tk.END, result)
+
+        search_term = re.sub(r"^to\s+", "", search_word, flags=re.IGNORECASE)
+        if not search_term:
+            search_term = search_word
+        escaped_words = r"\s+".join(
+            re.escape(part) for part in search_term.split()
+        )
+        search_pattern = re.compile(
+            rf"(?<!\w){escaped_words}(?!\w)",
+            flags=re.IGNORECASE,
+        )
+
+        matches = []
+        for line in filter_lines:
+            if "=" not in line:
+                continue
+            left_side, right_side = (part.strip() for part in line.split("=", 1))
+            if not left_side or not right_side:
+                continue
+
+            if search_pattern.search(right_side):
+                matches.append(f"[FILTER] Found: {right_side}\nGerman: {left_side}")
+            elif search_pattern.search(left_side):
+                matches.append(f"[FILTER] Found: {left_side}\nMeanings: {right_side}")
+
+        if matches:
+            self.ai_responses_textbox.insert(tk.END, "\n\n".join(matches) + "\n\n")
         else:
-            self.ai_responses_textbox.insert(tk.END, f"[FILTER] Word not found: {search_word}\n\n")
-            
-        # Auto-scroll to the bottom
+            self.ai_responses_textbox.insert(
+                tk.END,
+                f"[FILTER] Word not found: {search_word}\n\n",
+            )
+
         self.ai_responses_textbox.see(tk.END)
 
     def show_vocabulary_search(self):
@@ -5302,65 +5391,12 @@ Rules:
             self.root.destroy()
 
     def beautify_vocabulary(self):
-        """Choose which vocabulary to beautify."""
-        popup = tk.Toplevel(self.root)
-        popup.title("Beautify Vocabulary")
-        popup.configure(bg="#222")
-        popup.geometry("320x180")
-        popup.transient(self.root)
-        popup.grab_set()
-
-        tk.Label(
-            popup,
-            text="Choose a vocabulary to beautify:",
-            bg="#222",
-            fg="white",
-        ).pack(pady=(12, 8))
-
-        def beautify_current():
-            popup.destroy()
-            self.beautify_current_vocabulary()
-
-        def select_other():
-            popup.destroy()
-            filename = filedialog.askopenfilename(
-                title="Select Other Vocabulary",
-                filetypes=[
-                    ("Vocabulary files", "*_VOC.txt"),
-                    ("Text files", "*.txt"),
-                    ("All files", "*.*"),
-                ],
-                parent=self.root,
-            )
-            if filename:
-                self.beautify_vocabulary_file(filename)
-
-        def cancel():
-            popup.destroy()
-
-        ttk.Button(
-            popup,
-            text="Current Vocabulary",
-            style="SmallBlue.TButton",
-            command=beautify_current,
-        ).pack(fill=tk.X, padx=20, pady=3)
-        ttk.Button(
-            popup,
-            text="Select Other Vocabulary",
-            style="SmallGrayBlue.TButton",
-            command=select_other,
-        ).pack(fill=tk.X, padx=20, pady=3)
-        ttk.Button(
-            popup,
-            text="Cancel",
-            style="SmallRed.TButton",
-            command=cancel,
-        ).pack(fill=tk.X, padx=20, pady=3)
-        popup.protocol("WM_DELETE_WINDOW", cancel)
+        """Beautify only the vocabulary currently displayed in its textbox."""
+        self.beautify_current_vocabulary()
 
     @staticmethod
-    def _beautify_vocabulary_content(content):
-        """Remove leading numbers and duplicate non-empty lines, preserving order."""
+    def _beautify_vocabulary_content(content, normalize_current_entries=False):
+        """Clean vocabulary entries, preserving order and optional current-text formatting."""
         seen = set()
         unique_lines = []
         non_empty_line_count = 0
@@ -5369,19 +5405,36 @@ Rules:
             stripped_line = line.strip()
             if not stripped_line:
                 continue
+
+            if normalize_current_entries:
+                stripped_line = re.sub(
+                    r'^(?:(?:\d+\s*[.):]\s*|\(\s*\d+\s*\)\s*|'
+                    r'[A-Za-z]\s*[.)]\s*|\d+\s*[:]\s*|\d+\s*-\s+|'
+                    r'[-*+•▪◦‣]\s*|>+\s*))+',
+                    '',
+                    stripped_line,
+                )
+                stripped_line = ' '.join(stripped_line.split())
+                if not stripped_line:
+                    continue
+            else:
+                stripped_line = re.sub(r'^\d+\.\s*', '', stripped_line)
+
             non_empty_line_count += 1
 
-            cleaned_line = re.sub(r'^\d+\.\s*', '', stripped_line)
-            if cleaned_line not in seen:
-                seen.add(cleaned_line)
-                unique_lines.append(cleaned_line)
+            if stripped_line not in seen:
+                seen.add(stripped_line)
+                unique_lines.append(stripped_line)
 
         return '\n'.join(unique_lines) + '\n', non_empty_line_count - len(unique_lines)
 
     def beautify_current_vocabulary(self):
         """Beautify the vocabulary currently displayed in its textbox."""
         content = self.vocabulary_textbox.get(1.0, tk.END)
-        beautified_content, duplicate_count = self._beautify_vocabulary_content(content)
+        beautified_content, duplicate_count = self._beautify_vocabulary_content(
+            content,
+            normalize_current_entries=True,
+        )
         self.vocabulary_textbox.delete(1.0, tk.END)
         self.vocabulary_textbox.insert(tk.END, beautified_content)
 
@@ -5389,13 +5442,13 @@ Rules:
             messagebox.showinfo(
                 "Beautify Complete",
                 f"Removed {duplicate_count} duplicate entries\n"
-                "Removed preceding numbers from entries",
+                "Removed blank lines and leading list prefixes; normalized spacing",
                 parent=self.root,
             )
         else:
             messagebox.showinfo(
                 "Beautify Complete",
-                "Removed preceding numbers from entries",
+                "Removed blank lines and leading list prefixes; normalized spacing",
                 parent=self.root,
             )
 

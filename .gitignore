@@ -35,3 +35,5 @@ requirements-old.txt
 
 # words filter file
 Voc-Filter_VOC.txt
+
+current_mistakes_TXT.txt
