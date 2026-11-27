@@ -1868,7 +1868,7 @@ class VocabularyApp:
             add_buttons=False,
             label_button=("Append", self.append_vocabulary_to_file),
             secondary_label_button=(
-                "Pass this Vocabulary thru the filter",
+                "Remove words you know",
                 self.pass_vocabulary_through_filter,
             ),
         )
