@@ -1868,6 +1868,7 @@ class VocabularyApp:
             add_buttons=False,
             label_button=("Append", self.append_vocabulary_to_file)
         )
+        self.vocabulary_textbox.bind("<Double-Button-1>", self.on_vocabulary_text_double_click)
         self.study_textbox = self.create_labeled_textbox(
             left_frame,
             "Study Text Box:",
@@ -3003,6 +3004,61 @@ class VocabularyApp:
             messagebox.showinfo("Not found", f'"{word}" not found in Vocabulary.')
 
     # === NOUN LOOK-UP FUNCTIONALITY ===
+
+    def on_vocabulary_text_double_click(self, event):
+        """Append the selected German vocabulary entry to filter_VOC.txt."""
+        self.root.after_idle(self.save_selected_vocabulary_entry)
+
+    def save_selected_vocabulary_entry(self):
+        """Save the complete vocabulary line containing the double-clicked word."""
+        textbox = self.vocabulary_textbox
+        try:
+            selection_start = textbox.index(tk.SEL_FIRST)
+            line_start = textbox.index(f"{selection_start} linestart")
+            line_end = textbox.index(f"{selection_start} lineend")
+        except tk.TclError:
+            return
+
+        entry = textbox.get(line_start, line_end)
+        if not entry.strip():
+            return
+
+        equals_position = entry.find("=")
+        if equals_position >= 0 and not textbox.compare(
+            selection_start, "<", f"{line_start}+{equals_position}c"
+        ):
+            return
+
+        filter_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "filter_VOC.txt"
+        )
+        try:
+            with open(filter_path, "r", encoding="utf-8-sig") as filter_file:
+                existing_content = filter_file.read()
+        except FileNotFoundError:
+            existing_content = ""
+        except OSError as error:
+            messagebox.showerror(
+                "Filter Update Error",
+                f"Failed to read filter_VOC.txt:\n{error}",
+                parent=self.root,
+            )
+            return
+
+        if entry in existing_content.splitlines():
+            return
+
+        try:
+            with open(filter_path, "a", encoding="utf-8") as filter_file:
+                if existing_content and not existing_content.endswith(("\n", "\r")):
+                    filter_file.write("\n")
+                filter_file.write(entry + "\n")
+        except OSError as error:
+            messagebox.showerror(
+                "Filter Update Error",
+                f"Failed to append to filter_VOC.txt:\n{error}",
+                parent=self.root,
+            )
 
     def on_study_text_double_click(self, event):
         """Handle double-click on study text to lookup German nouns"""
