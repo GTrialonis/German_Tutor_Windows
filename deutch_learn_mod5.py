@@ -1866,7 +1866,11 @@ class VocabularyApp:
             label_font=self.left_section_font,
             textbox_font=self.textbox_font,
             add_buttons=False,
-            label_button=("Append", self.append_vocabulary_to_file)
+            label_button=("Append", self.append_vocabulary_to_file),
+            secondary_label_button=(
+                "Pass this Vocabulary thru the filter",
+                self.pass_vocabulary_through_filter,
+            ),
         )
         self.vocabulary_textbox.bind("<Double-Button-1>", self.on_vocabulary_text_double_click)
         self.study_textbox = self.create_labeled_textbox(
@@ -2648,7 +2652,7 @@ class VocabularyApp:
         except Exception as e:
             messagebox.showerror("Open Error", f"Could not open in Notepad: {e}", parent=self.root)
 
-    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False, label_button=None, additional_label_button=None):
+    def create_labeled_textbox(self, parent, label_text, scrollbar=True, height=10, label_font="Helvetica", textbox_font=None, add_buttons=False, label_button=None, secondary_label_button=None, additional_label_button=None):
         """Create a labeled textbox with optional scrollbar and highlight buttons"""
         frame = tk.Frame(parent, bg="#222")
         frame.pack(fill=tk.X, padx=10, pady=(6, 0))
@@ -2677,6 +2681,20 @@ class VocabularyApp:
             label_action_button.pack(side=tk.LEFT, padx=(18, 0))
             if button_text == "Append":
                 Tooltip(label_action_button, "Append the contents of the vocabulary to a file.")
+
+        if secondary_label_button:
+            button_text, button_command = secondary_label_button
+            filter_button = ttk.Button(
+                label_row,
+                text=button_text,
+                style="SmallLimeGreen.TButton",
+                command=button_command,
+            )
+            filter_button.pack(side=tk.LEFT, padx=(8, 0))
+            Tooltip(
+                filter_button,
+                "Remove entries whose German headword is already in filter_VOC.txt.",
+            )
 
         if additional_label_button:
             button_text, button_command = additional_label_button
@@ -3906,6 +3924,93 @@ Rules:
         self.score_label.config(text="0%")
         self.test_filename_label.config(text=f"File is: {file_path}")
         self.display_random_word()
+
+    def pass_vocabulary_through_filter(self):
+        """Remove current vocabulary entries whose German headwords are in filter_VOC.txt."""
+        try:
+            current_content = self.vocabulary_textbox.get("1.0", "end-1c")
+        except tk.TclError as error:
+            messagebox.showerror(
+                "Vocabulary Error",
+                f"Could not read Vocabulary (Current): {error}",
+                parent=self.root,
+            )
+            return
+
+        if not current_content.strip():
+            messagebox.showinfo(
+                "No vocabulary",
+                "The Vocabulary (Current) textbox is empty.",
+                parent=self.root,
+            )
+            return
+
+        filter_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "filter_VOC.txt"
+        )
+        try:
+            with open(filter_path, "r", encoding="utf-8-sig") as filter_file:
+                filter_content = filter_file.read()
+        except OSError as error:
+            messagebox.showerror(
+                "Filter Error",
+                f"Could not read filter_VOC.txt:\n{error}",
+                parent=self.root,
+            )
+            return
+
+        def german_headword(entry):
+            german_entry = entry.split("=", 1)[0].strip()
+            return german_entry.split(",", 1)[0].strip().casefold()
+
+        filter_headwords = set()
+        for line in filter_content.splitlines():
+            headword = german_headword(line)
+            if headword:
+                filter_headwords.add(headword)
+
+        if not filter_headwords:
+            messagebox.showinfo(
+                "Empty filter",
+                "filter_VOC.txt contains no vocabulary entries.",
+                parent=self.root,
+            )
+            return
+
+        remaining_lines = []
+        removed_count = 0
+        for line in current_content.splitlines(keepends=True):
+            entry = line.rstrip("\r\n")
+            if german_headword(entry) in filter_headwords:
+                removed_count += 1
+            else:
+                remaining_lines.append(line)
+
+        if not removed_count:
+            messagebox.showinfo(
+                "Filter complete",
+                "No Vocabulary (Current) entries matched filter_VOC.txt.",
+                parent=self.root,
+            )
+            return
+
+        remaining_content = "".join(remaining_lines)
+        if not any(line.strip() for line in remaining_content.splitlines()):
+            remaining_content = ""
+
+        self.vocabulary_textbox.delete("1.0", tk.END)
+        self.vocabulary_textbox.insert("1.0", remaining_content)
+        self.vocabulary = [
+            line.strip() for line in remaining_content.splitlines() if line.strip()
+        ]
+
+        messagebox.showinfo(
+            "Filter complete",
+            f"Removed {removed_count} entries from Vocabulary (Current). "
+            f"{len(self.vocabulary)} entries remain.\n\n"
+            "The original vocabulary file was not overwritten. Use SAVE-VOC to save the result.",
+            parent=self.root,
+        )
 
     def load_filter_vocabulary(self):
         """Load filter vocabulary from Voc-Filter_VOC.txt into the Vocabulary textbox"""
